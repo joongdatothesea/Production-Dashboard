@@ -4871,6 +4871,7 @@ const DeliverySection: React.FC<SectionProps> = ({ color }) => {
   const [bestTonnage, setBestTonnage] = useState<BestTonnage | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState('');
+  const [bonusToolOpen, setBonusToolOpen] = useState(false);
 
   useEffect(() => {
     idbGet<LKPeriod[]>('loaderKpiPeriods').then(d => { if (d?.length) setLkPeriods(d); });
@@ -5531,6 +5532,39 @@ const DeliverySection: React.FC<SectionProps> = ({ color }) => {
           </div>
         </div>
       )}
+
+      {/* ── Loader Bonus Tool (collapsible iframe) ─────────────────── */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <button
+          onClick={() => setBonusToolOpen(o => !o)}
+          className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <BarChart2 size={14} className="text-amber-500" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">
+              Loader Bonus Calculator — 奖金计算工具
+            </span>
+            <span className="text-[9px] text-slate-400 font-medium">
+              效率分 · 难度分 · 班次系数 · PDF 导出
+            </span>
+          </div>
+          <div className={cn('transition-transform duration-200', bonusToolOpen ? 'rotate-180' : '')}>
+            <ChevronDown size={14} className="text-slate-400" />
+          </div>
+        </button>
+
+        {bonusToolOpen && (
+          <div className="border-t border-slate-100">
+            <iframe
+              src="/loader-bonus.html"
+              className="w-full border-0"
+              style={{ height: '90vh', minHeight: 700 }}
+              title="Loader Bonus Calculator"
+              allow="downloads"
+            />
+          </div>
+        )}
+      </div>
     </SectionWrapper>
   );
 };

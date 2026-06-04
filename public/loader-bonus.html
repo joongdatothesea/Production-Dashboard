@@ -1,0 +1,1959 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Loader Bonus Calculator v3</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+:root{--bg:#0f1117;--sf:#1a1d27;--sf2:#222533;--bd:#2e3347;--tx:#e8eaf0;--mt:#6b7280;--gn:#22c55e;--gd:#166534;--gb:#052e16;--am:#f59e0b;--ab:#451a03;--bl:#3b82f6;--bb:#1e3a5f;--rd:#ef4444;--rb:#3f0f0f;--mo:'IBM Plex Mono',monospace;--sa:'IBM Plex Sans',sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sa);background:var(--bg);color:var(--tx);min-height:100vh}
+.hdr{background:var(--sf);border-bottom:1px solid var(--bd);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.hdr-l{display:flex;align-items:center;gap:10px}
+.logo{width:30px;height:30px;background:var(--gn);border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#000;font-family:var(--mo)}
+.ttl{font-size:14px;font-weight:600}
+.sub{font-size:10px;color:var(--mt);font-family:var(--mo)}
+.si{font-size:10px;color:var(--gn);font-family:var(--mo);opacity:.3;transition:opacity .3s}
+.si.on{opacity:1}
+.lay{display:grid;grid-template-columns:200px 1fr;min-height:calc(100vh - 53px)}
+.sb{background:var(--sf);border-right:1px solid var(--bd);padding:12px 0;position:sticky;top:53px;height:calc(100vh - 53px);overflow-y:auto}
+.ng{padding:0 6px;margin-bottom:2px}
+.nl{font-size:9px;font-weight:600;color:var(--mt);letter-spacing:.08em;text-transform:uppercase;padding:8px 8px 3px;font-family:var(--mo)}
+.ni2{display:flex;align-items:center;gap:7px;padding:7px 8px;border-radius:5px;cursor:pointer;font-size:12px;color:var(--mt);transition:all .12s;border:1px solid transparent}
+.ni2:hover{background:var(--sf2);color:var(--tx)}
+.ni2.act{background:var(--gb);color:var(--gn);border-color:var(--gd)}
+.nd{width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+.mn{padding:20px;overflow-y:auto}
+.pnl{display:none}.pnl.act{display:block}
+/* Cards */
+.card{background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:18px;margin-bottom:14px}
+.ct{font-size:11px;font-weight:600;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;font-family:var(--mo);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+.ct-badge{font-size:9px;background:var(--gb);color:var(--gn);border:1px solid var(--gd);padding:2px 7px;border-radius:20px;font-weight:600}
+/* Formula */
+.fb{background:linear-gradient(135deg,#0a1628,#0d2240);border:1px solid var(--bb);border-left:4px solid var(--bl);border-radius:10px;padding:14px 18px;margin-bottom:14px;font-family:var(--mo)}
+.fl{font-size:12px;color:#93c5fd;margin-bottom:3px}.fl strong{color:#60a5fa}
+.fn{font-size:10px;color:var(--mt);margin-top:8px;line-height:1.7;font-family:var(--sa)}
+/* Drop */
+.dz{border:2px dashed var(--bd);border-radius:10px;padding:36px;text-align:center;cursor:pointer;transition:all .2s;background:var(--sf)}
+.dz:hover,.dz.ov{border-color:var(--gn);background:var(--gb)}
+.dz input{display:none}
+/* Stats */
+.sr{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.sc{background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px 14px}
+.sc.g{border-left:3px solid var(--gn)}.sc.b{border-left:3px solid var(--bl)}.sc.a{border-left:3px solid var(--am)}.sc.r{border-left:3px solid var(--rd)}
+.sl{font-size:10px;color:var(--mt);font-family:var(--mo);margin-bottom:3px}
+.sv{font-size:20px;font-weight:600;font-family:var(--mo)}
+.ss{font-size:9px;color:var(--mt);margin-top:2px}
+/* Table */
+.tw{overflow-x:auto;border:1px solid var(--bd);border-radius:10px}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{padding:9px 10px;background:var(--sf2);border-bottom:1px solid var(--bd);font-weight:500;color:var(--mt);text-align:center;white-space:nowrap;font-family:var(--mo);font-size:10px}
+th.tl{text-align:left}
+td{padding:7px 10px;border-bottom:1px solid rgba(46,51,71,.4);text-align:center;color:var(--tx)}
+td.tl{text-align:left;font-size:11px}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--sf2)}
+.gv{color:var(--gn);font-weight:600;font-family:var(--mo)}
+.av{color:var(--am);font-weight:600;font-family:var(--mo)}
+.bv{color:#60a5fa;font-weight:700;font-family:var(--mo)}
+.mn2{font-family:var(--mo)}
+/* Badge */
+.bdg{display:inline-block;padding:1px 7px;border-radius:20px;font-size:9px;font-weight:600;font-family:var(--mo)}
+.bam{background:var(--bb);color:#93c5fd;border:1px solid #1e3a5f}
+.bpm{background:var(--ab);color:#fcd34d;border:1px solid #78350f}
+.bok{background:var(--gb);color:var(--gn);border:1px solid var(--gd)}
+.bno{background:var(--rb);color:#fca5a5;border:1px solid #7f1d1d}
+.bcap{background:#3f1f00;color:#fb923c;border:1px solid #7c3000;font-size:9px}
+/* Person cards */
+.pg{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.pc{background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:14px;cursor:pointer;transition:all .12s}
+.pc:hover{border-color:var(--mt)}.pc.sel{border-color:var(--gn);background:var(--gb)}
+.pc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.pc-av{width:34px;height:34px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;font-family:var(--mo);flex-shrink:0}
+.pc-nm{font-size:12px;font-weight:600;margin-bottom:1px}
+.pc-sh{font-size:10px;color:var(--mt);font-family:var(--mo)}
+.pc-bn{font-size:18px;font-weight:700;color:var(--gn);font-family:var(--mo)}
+.pc-br{height:4px;background:var(--sf2);border-radius:2px;margin-bottom:6px;overflow:hidden;display:flex}
+.pc-mt{display:flex;gap:10px;flex-wrap:wrap}
+.pc-mi{font-size:10px;color:var(--mt);font-family:var(--mo)}.pc-mi span{color:var(--tx)}
+/* Detail */
+.db-box{background:var(--sf);border:1px solid var(--bd);border-radius:10px;overflow:hidden;margin-bottom:14px}
+.db-h{background:var(--sf2);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--bd)}
+.db-nm{font-size:13px;font-weight:600}
+.db-bn{font-size:17px;font-weight:700;color:var(--gn);font-family:var(--mo)}
+.db-bd{padding:14px}
+.dg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.dg-s{background:var(--sf2);border-radius:7px;padding:9px;text-align:center}
+.dg-v{font-size:14px;font-weight:700;font-family:var(--mo);margin-bottom:2px}
+.dg-l{font-size:9px;color:var(--mt)}
+.sp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.sp-c{border-radius:7px;padding:11px}
+.sp-c.ef{background:var(--gb);border:1px solid var(--gd)}
+.sp-c.df{background:var(--ab);border:1px solid #92400e}
+.sp-l{font-size:10px;font-weight:600;margin-bottom:3px}
+.sp-v{font-size:18px;font-weight:700;font-family:var(--mo)}
+.sp-s{font-size:9px;color:var(--mt);margin-top:2px}
+/* Settings */
+.stg{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.sg{background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:14px}
+.sg-t{font-size:11px;font-weight:600;color:var(--mt);font-family:var(--mo);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+.sv-ok{font-size:9px;color:var(--gn);opacity:0;transition:opacity .3s}
+.sv-ok.on{opacity:1}
+.set-r{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:11px}
+.set-r label{color:var(--mt);min-width:100px;font-family:var(--mo)}
+.ni{width:68px;padding:5px 7px;background:var(--bg);border:1px solid var(--bd);border-radius:5px;color:var(--tx);font-size:11px;font-family:var(--mo)}
+.ni:focus{outline:none;border-color:var(--gn)}
+.ti{padding:5px 7px;background:var(--bg);border:1px solid var(--bd);border-radius:5px;color:var(--tx);font-size:11px;font-family:var(--mo)}
+.ti:focus{outline:none;border-color:var(--gn)}
+.tr-r{display:flex;align-items:center;gap:6px;margin-bottom:7px;font-size:11px;color:var(--mt);font-family:var(--mo)}
+.tr-r .ni{width:54px}
+/* Score table */
+.sgw{overflow:auto;height:calc(100vh - 200px);min-height:500px;border:1px solid var(--bd);border-radius:10px}
+table.sg{border-collapse:collapse;font-size:10px;width:auto;min-width:100%}
+table.sg th{padding:4px 5px;width:32px;min-width:32px;max-width:32px;background:var(--sf2);color:var(--mt);font-weight:500;text-align:center;border-bottom:1px solid var(--bd);border-right:1px solid var(--bd);position:sticky;top:0;z-index:3;white-space:nowrap;font-family:var(--mo)}
+table.sg th:first-child{position:sticky;left:0;z-index:4;width:58px;min-width:58px;max-width:58px}
+table.sg td.rh{background:var(--sf2);font-weight:600;text-align:right;padding:2px 7px;width:58px;min-width:58px;max-width:58px;border-right:1px solid var(--bd);border-bottom:1px solid var(--bd);position:sticky;left:0;z-index:2;font-family:var(--mo);color:var(--tx)}
+table.sg td.sc{border-right:1px solid var(--bd);border-bottom:1px solid var(--bd);padding:0;width:32px;min-width:32px;max-width:32px;height:24px;position:relative}
+table.sg td.sc .lb{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;pointer-events:none;font-family:var(--mo)}
+table.sg td.sc input{position:absolute;inset:0;width:100%;height:100%;opacity:0;border:none;outline:none;cursor:pointer;background:transparent}
+table.sg td.sc input:focus{opacity:1;background:#1a1d27;color:#fff;font-weight:700;text-align:center;outline:2px solid var(--gn);outline-offset:-2px;border-radius:2px;z-index:5;font-family:var(--mo);font-size:10px}
+table.sg td.v1{background:#14532d}table.sg td.v1 .lb{color:#86efac}
+table.sg td.v09{background:#166534}table.sg td.v09 .lb{color:#4ade80}
+table.sg td.v08{background:#052e16}table.sg td.v08 .lb{color:#22c55e}
+table.sg td.vX{background:#1e3a5f}table.sg td.vX .lb{color:#93c5fd}
+table.sg td.v0 .lb{color:#374151}
+/* Shift */
+.sw-g{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.sw-c{border:1px solid var(--bd);border-radius:10px;padding:13px;background:var(--sf)}
+.sw-c.am{border-top:3px solid var(--bl)}.sw-c.pm{border-top:3px solid var(--am)}
+.sw-t{font-size:12px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:7px;font-family:var(--mo)}
+.sw-r{display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid rgba(46,51,71,.4);font-family:var(--mo);color:var(--mt)}
+.sw-r:last-child{border-bottom:none;font-weight:600;color:var(--tx);padding-top:5px}
+.sw-r span:last-child{color:var(--tx)}
+/* Chart */
+.cw{position:relative;width:100%;height:200px;margin-bottom:12px}
+/* Filters */
+.fr{display:flex;gap:7px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+.fr select,.fr input[type=text]{padding:5px 8px;background:var(--sf);border:1px solid var(--bd);border-radius:5px;color:var(--tx);font-size:11px;font-family:var(--mo)}
+.fr select:focus,.fr input:focus{outline:none;border-color:var(--gn)}
+/* Buttons */
+.btn{padding:6px 12px;border-radius:5px;border:1px solid var(--bd);background:var(--sf2);color:var(--tx);font-size:11px;cursor:pointer;font-family:var(--sa);transition:all .12s}
+.btn:hover{border-color:var(--mt)}.btn-g{background:var(--gn);color:#000;border-color:var(--gn);font-weight:600}.btn-g:hover{opacity:.85}.btn-p{background:var(--bl);color:#fff;border-color:var(--bl);font-weight:500}.btn-p:hover{opacity:.85}.btn-s{padding:3px 7px;font-size:10px}
+.row{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.msg{margin-top:8px;font-size:11px;text-align:center;font-family:var(--mo)}
+.msg.ok{color:var(--gn)}.msg.er{color:var(--rd)}
+@media print{
+  body > *{display:none!important}
+  #printArea{display:block!important;position:fixed;top:0;left:0;width:100%;background:#fff;padding:10mm 12mm;font-family:Arial,sans-serif}
+  @page{size:A4;margin:8mm 10mm}
+}
+#printArea{display:none}
+/* Notice */
+.nv{background:#fff;border-radius:8px;padding:0;font-family:'Microsoft YaHei','PingFang SC',Arial,sans-serif;font-size:10px;line-height:1.4;color:#111;overflow-y:auto}
+/* Vehicle detail table - for trucks page */
+.cap-row td{background:rgba(251,146,60,.06)!important}
+.cap-tag{font-size:9px;background:#3f1f00;color:#fb923c;border:1px solid #7c3000;padding:1px 5px;border-radius:10px;font-family:var(--mo)}
+.inel-row td{background:rgba(239,68,68,.04)!important}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div class="hdr-l">
+    <div class="logo">LB</div>
+    <div>
+      <div class="ttl">Loader Bonus Calculator</div>
+      <div class="sub">v3 · 综合系数=(效率分+难度分)×班次系数×人数系数 · 门槛≥1.0 · 每人单车上限$<span id="capLabel">50</span> · Is_Valid=1</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <div class="si" id="si">⬤ 参数已保存</div>
+    <button class="btn btn-g btn-s" onclick="exportReport()">导出完整报告</button>
+  </div>
+</div>
+
+<div class="lay">
+  <div class="sb">
+    <div class="ng">
+      <div class="nl">数据</div>
+      <div class="ni2 act" onclick="gT('upload',this)"><span class="nd"></span>上传数据</div>
+      <div class="ni2" onclick="gT('ranking',this)"><span class="nd"></span>排名结果</div>
+      <div class="ni2" onclick="gT('persons',this)"><span class="nd"></span>个人详情</div>
+      <div class="ni2" onclick="gT('trucks',this)"><span class="nd"></span>装车明细</div>
+      <div class="ni2" onclick="gT('shift',this)"><span class="nd"></span>班次总览</div>
+    </div>
+    <div class="ng">
+      <div class="nl">配置</div>
+      <div class="ni2" onclick="gT('scoretable',this)"><span class="nd"></span>计分表 🔒</div>
+      <div class="ni2" onclick="gT('settings',this)"><span class="nd"></span>参数设置 🔒</div>
+    </div>
+    <div class="ng">
+      <div class="nl">输出</div>
+      <div class="ni2" onclick="gT('pdf',this)"><span class="nd"></span>生成 PDF</div>
+    </div>
+    <div style="padding:14px;font-size:9px;color:#374151;font-family:var(--mo);line-height:1.8;margin-top:8px">
+      参数自动保存<br>刷新不丢失
+    </div>
+  </div>
+
+  <div class="mn">
+
+    <!-- UPLOAD -->
+    <div class="pnl act" id="p-upload">
+      <div class="fb">
+        <div class="fl"><strong>综合系数</strong> = (效率分×<span id="wEffFL">1.0</span> + 难度分×<span id="wDiffFL">1.0</span>) × 最终班次系数 × 人数系数 &nbsp;·&nbsp; 综合系数 ≥ <span id="minCombFL">1.0</span> 才计奖</div>
+        <div class="fl"><strong>最终班次系数</strong> = 发货量系数 × 效率系数 &nbsp;·&nbsp; <strong>效率</strong> = 有效发货量(t) ÷ 有效工作时间(h，首→末车)</div>
+        <div class="fl"><strong>每人奖金</strong> = min(重量t × 综合系数 ÷ 人数, 每人上限$<span id="capFL">50</span>) &nbsp;·&nbsp; <strong>奖金池</strong> = 每人奖金 × 人数</div>
+        <div class="fn">难度分 = Point_12m + Machines + Mesh + Orders + Projects（直接加）· 只计 Is_Valid=1 · 班次系数按有效记录吨数</div>
+      </div>
+      <!-- file input must be OUTSIDE the label/dz to avoid double-trigger issues -->
+      <input type="file" id="xlf" accept=".xlsx,.xls" style="display:none" onchange="loadFile(this.files[0])">
+      <label for="xlf" class="dz" id="dz" style="display:block;cursor:pointer">
+        <div style="font-size:28px;margin-bottom:8px">📂</div>
+        <div style="font-size:13px;font-weight:500;margin-bottom:3px">点击上传或拖放 Excel 文件</div>
+        <div style="font-size:11px;color:var(--mt);margin-bottom:12px">.xlsx / .xls — 两周系统导出数据</div>
+        <div style="margin-top:4px">
+          <span style="display:inline-block;padding:7px 20px;background:var(--gn);color:#000;border-radius:5px;font-size:12px;font-weight:600;font-family:var(--sa)">选择文件</span>
+        </div>
+      </label>
+      <div class="msg" id="upMsg"></div>
+      <div id="upSum" style="margin-top:14px;display:none">
+        <div class="sr" id="upSt"></div>
+        <div class="cw"><canvas id="upCh"></canvas></div>
+        <div style="display:flex;gap:14px;justify-content:center;font-size:10px;color:var(--mt);margin-bottom:12px;font-family:var(--mo)">
+          <span>■ <span style="color:#60a5fa">早班 AM</span></span>
+          <span>■ <span style="color:#fcd34d">下午班 PM</span></span>
+        </div>
+        <div class="row" style="justify-content:flex-end">
+          <button class="btn btn-p btn-s" onclick="gT('ranking',document.querySelectorAll('.ni2')[1])">查看排名 →</button>
+          <button class="btn btn-s" onclick="gT('trucks',document.querySelectorAll('.ni2')[3])">查看装车明细 →</button>
+        </div>
+        <!-- Period summary cards -->
+        <div id="periodCards" style="margin-top:16px"></div>
+        <!-- Efficiency stats table -->
+        <div id="effStats" style="margin-top:14px"></div>
+      </div>
+    </div>
+
+    <!-- RANKING -->
+    <div class="pnl" id="p-ranking">
+      <div class="card">
+        <div class="ct">奖金排名 <span class="ct-badge" id="validInfo"></span></div>
+        <div class="tw">
+          <table>
+            <thead><tr>
+              <th>排名</th><th class="tl">姓名</th><th>班次</th><th>有效车次</th>
+              <th>重量(t)</th><th>均时(分)</th><th>均基础分</th><th>难度合计</th>
+              <th style="color:var(--gn)">效率奖金</th><th style="color:var(--am)">难度奖金</th>
+              <th style="color:#60a5fa">总奖金($)</th>
+            </tr></thead>
+            <tbody id="rankBody"><tr><td colspan="11" style="padding:2rem;color:var(--mt)">请先上传数据</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- PERSONS -->
+    <div class="pnl" id="p-persons">
+      <div class="pg" id="personCards">
+        <div style="grid-column:1/-1;padding:2rem;text-align:center;color:var(--mt)">请先上传数据</div>
+      </div>
+      <div class="db-box" id="detailPanel" style="display:none">
+        <div class="db-h"><span class="db-nm" id="dpName">—</span><span class="db-bn" id="dpBonus"></span></div>
+        <div class="db-bd">
+          <div class="dg" id="dpGrid"></div>
+          <div class="sp">
+            <div class="sp-c ef"><div class="sp-l" style="color:var(--gn)">效率奖金（基础分×80%）</div><div class="sp-v" id="dpEB" style="color:var(--gn)"></div><div class="sp-s">均基础分：<span id="dpAB"></span> · 均时：<span id="dpAT"></span>分</div></div>
+            <div class="sp-c df"><div class="sp-l" style="color:var(--am)">难度奖金（难度分直接加）</div><div class="sp-v" id="dpDB" style="color:var(--am)"></div><div class="sp-s">难度合计：<span id="dpDS"></span> · 均每车：<span id="dpAD"></span></div></div>
+          </div>
+          <div style="background:var(--sf2);border-radius:7px;padding:11px;font-size:11px;font-family:var(--mo);display:grid;grid-template-columns:1fr 1fr;gap:5px">
+            <div><span style="color:var(--mt)">早班装车：</span><span id="dpAm"></span></div>
+            <div><span style="color:var(--mt)">下午班装车：</span><span id="dpPm"></span></div>
+            <div><span style="color:var(--mt)">早班重量：</span><span id="dpAmW"></span></div>
+            <div><span style="color:var(--mt)">下午班重量：</span><span id="dpPmW"></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TRUCKS (new!) -->
+    <div class="pnl" id="p-trucks">
+      <div class="card">
+        <div class="ct">装车明细 <span class="ct-badge" id="truckCount"></span></div>
+        <div class="fr">
+          <select id="trDate" onchange="renderTrucks()"><option value="">所有日期</option></select>
+          <select id="trShift" onchange="renderTrucks()"><option value="">全部班次</option><option value="AM">早班</option><option value="PM">下午班</option></select>
+          <select id="trLoader" onchange="renderTrucks()"><option value="">所有人员</option></select>
+          <select id="trValid" onchange="renderTrucks()"><option value="">有效+无效</option><option value="1">仅有效</option><option value="0">仅无效</option></select>
+          <input type="text" id="trSearch" placeholder="搜索车辆..." oninput="renderTrucks()" style="flex:1;min-width:100px">
+        </div>
+        <div class="tw">
+          <table>
+            <thead><tr>
+              <th>日期</th><th>班次</th><th class="tl">车辆</th><th>重量(kg)</th>
+              <th>时间(分)</th><th>人数</th><th class="tl">装车人员</th>
+              <th>基础分</th><th>难度分</th><th>综合系数</th>
+              <th>发货量系数</th><th style="color:#fcd34d">效率(t/h)</th><th style="color:#fcd34d">效率系数</th><th>人数系数</th>
+              <th>奖金池($)</th>
+              <th>每人奖金($)<br><span style="color:var(--am);font-size:8px">上限$<span class="cap-lbl">50</span>/人</span></th><th>状态</th>
+            </tr></thead>
+            <tbody id="truckBody"><tr><td colspan="16" style="padding:2rem;color:var(--mt)">请先上传数据</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- SHIFT -->
+    <div class="pnl" id="p-shift">
+      <div class="fr">
+        <select id="sv" onchange="renderShift()"><option value="daily">按日查看</option><option value="weekly">按周汇总</option></select>
+        <select id="swk" onchange="renderShift()"><option value="">所有周次</option></select>
+      </div>
+      <div id="shiftContent"></div>
+    </div>
+
+    <!-- SCORE TABLE -->
+    <div class="pnl" id="p-scoretable">
+      <div class="card" style="overflow:hidden">
+        <div class="ct">基础效率分计分表 <span class="ct-badge">修改自动保存</span></div>
+        <div class="row" style="margin-bottom:12px">
+          <button class="btn btn-s" onclick="resetST()">恢复默认</button>
+          <button class="btn btn-s btn-p" onclick="applyRecalc()">应用并重算 ↗</button>
+          <div style="display:flex;gap:10px;margin-left:auto;font-size:10px;color:var(--mt);align-items:center;font-family:var(--mo)">
+            <span><span style="color:#86efac">■</span> 1.0</span><span><span style="color:#4ade80">■</span> 0.9</span><span><span style="color:#22c55e">■</span> 0.8</span><span><span style="color:#93c5fd">■</span> 自定义</span>
+          </div>
+        </div>
+        <div class="sgw" id="sgWrap"></div>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="pnl" id="p-settings">
+      <div style="font-size:11px;color:var(--gn);font-family:var(--mo);margin-bottom:12px">⬤ 所有参数自动保存，刷新不丢失</div>
+      <div class="stg">
+        <div class="sg" style="grid-column:1/-1">
+          <div class="sg-t">奖金计算公式 <span class="sv-ok" id="sv0">已保存 ✓</span></div>
+          <div class="set-r">
+            <label>每人单车奖金上限 ($)</label>
+            <input type="number" class="ni" id="maxPool" value="50" step="1" min="1" max="999" onchange="saveSetting('maxPool',this.value);updateCapLabels();recalcAll();showSaved('sv0')">
+            <span style="font-size:10px;color:var(--mt);font-family:var(--mo)">每人从单台车最多获得此金额 · 每人奖金 = min(综合系数×重量t÷人数, 此上限)</span>
+          </div>
+          <div class="set-r">
+            <label>效率分权重</label>
+            <input type="number" class="ni" id="wEff" value="1.0" step="0.05" min="0" max="5" onchange="saveSetting('wEff',this.value);updateFormulaDisplay();recalcAll();showSaved('sv0')">
+            <span style="font-size:10px;color:var(--mt);font-family:var(--mo)">综合系数 = (效率分 × <span id="wEffLbl">1.0</span> + 难度分 × <span id="wDiffLbl">1.0</span>) × 班次系数 × 人数系数</span>
+          </div>
+          <div class="set-r">
+            <label>难度分权重</label>
+            <input type="number" class="ni" id="wDiff" value="1.0" step="0.05" min="0" max="5" onchange="saveSetting('wDiff',this.value);updateFormulaDisplay();recalcAll();showSaved('sv0')">
+          </div>
+          <div class="set-r">
+            <label>计奖最低综合系数</label>
+            <input type="number" class="ni" id="minCombined" value="1.0" step="0.05" min="0" max="5" onchange="saveSetting('minCombined',this.value);updateFormulaDisplay();recalcAll();showSaved('sv0')">
+            <span style="font-size:10px;color:var(--mt);font-family:var(--mo)">综合系数 ≥ <span id="minCombLbl">1.0</span> 才计奖，否则该台车奖金为 $0</span>
+          </div>
+          <div style="margin-top:8px;padding:8px 12px;background:var(--sf2);border-radius:6px;font-size:10px;font-family:var(--mo);line-height:1.9;color:var(--mt)">
+            <span style="color:var(--tx);font-weight:600">综合系数</span> = (效率分×<span id="wEffDisp">1.0</span> + 难度分×<span id="wDiffDisp">1.0</span>) × 最终班次系数 × 人数系数<br>
+            <span style="color:var(--tx);font-weight:600">最终班次系数</span> = 发货量系数 × 效率系数（效率=发货量t÷工时h）<br>
+            <span style="color:var(--tx);font-weight:600">奖金条件</span> = 综合系数 ≥ <span id="minCombDisp">1.0</span> 才计奖，否则该台车奖金为 $0<br>
+            <span style="color:var(--tx);font-weight:600">每人奖金</span> = min(综合系数 × 重量t ÷ 人数, 每人上限$<span class="cap-lbl">50</span>) &nbsp;·&nbsp; <span style="color:var(--gn)">上限作用于每个人，不是奖金池总额</span>
+          </div>
+        </div>
+        <div class="sg">
+          <div class="sg-t">人数效率系数 <span class="sv-ok" id="sv2">已保存 ✓</span></div>
+          <div class="set-r"><label>1人装车</label><input type="number" class="ni" id="c1" value="1.5" step="0.05" min="0.5" max="3" onchange="saveSetting('c1',this.value);recalcAll();showSaved('sv2')"></div>
+          <div class="set-r"><label>2人装车</label><input type="number" class="ni" id="c2" value="1.3" step="0.05" min="0.5" max="3" onchange="saveSetting('c2',this.value);recalcAll();showSaved('sv2')"></div>
+          <div class="set-r"><label>3人装车</label><input type="number" class="ni" id="c3" value="1.0" step="0.05" min="0.5" max="3" onchange="saveSetting('c3',this.value);recalcAll();showSaved('sv2')"></div>
+          <div style="font-size:9px;color:var(--mt);font-family:var(--mo);margin-top:6px;line-height:1.6">
+            AM/PM班3人组均允许提前备货 · c3适用于所有班次的3人装车
+          </div>
+        </div>
+        <div class="sg">
+          <div class="sg-t">班次时间 <span class="sv-ok" id="sv3">已保存 ✓</span></div>
+          <div class="set-r"><label>早班开始</label><input type="time" class="ti" id="amS" value="06:00" onchange="saveSetting('amS',this.value);recalcAll();showSaved('sv3')"></div>
+          <div class="set-r"><label>早班结束</label><input type="time" class="ti" id="amE" value="14:00" onchange="saveSetting('amE',this.value);recalcAll();showSaved('sv3')"></div>
+          <div class="set-r"><label>下午班开始</label><input type="time" class="ti" id="pmS" value="14:00" onchange="saveSetting('pmS',this.value);recalcAll();showSaved('sv3')"></div>
+          <div class="set-r"><label>下午班结束</label><input type="time" class="ti" id="pmE" value="22:00" onchange="saveSetting('pmE',this.value);recalcAll();showSaved('sv3')"></div>
+        </div>
+        <div class="sg" style="grid-column:1/-1">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <!-- 发货量阶梯 -->
+            <div>
+              <div class="sg-t" style="margin-bottom:10px">班次发货量激励阶梯 <span class="sv-ok" id="sv4">已保存 ✓</span></div>
+              <div style="font-size:10px;color:var(--mt);font-family:var(--mo);margin-bottom:8px;line-height:1.6">发货量(t) → 系数 · 当日该班次有效总吨数</div>
+              <div id="tierRows"></div>
+              <button class="btn btn-s" onclick="addTier()" style="margin-top:7px">+ 添加阶梯</button>
+            </div>
+            <!-- 效率阶梯 -->
+            <div style="border-left:1px solid var(--bd);padding-left:14px">
+              <div class="sg-t" style="margin-bottom:10px">班次装载效率阶梯 <span class="sv-ok" id="sv5">已保存 ✓</span></div>
+              <div style="font-size:10px;color:var(--mt);font-family:var(--mo);margin-bottom:8px;line-height:1.6">效率(t/h) → 系数 · 效率=发货量÷工时(首→末车)</div>
+              <div id="effTierRows"></div>
+              <button class="btn btn-s" onclick="addEffTier()" style="margin-top:7px">+ 添加阶梯</button>
+              <div style="margin-top:8px;padding:7px 9px;background:var(--sf2);border-radius:5px;font-size:10px;font-family:var(--mo);line-height:1.7;color:var(--mt)">
+                最终班次系数 = <span style="color:var(--tx)">发货量系数 × 效率系数</span><br>
+                历史参考：中位 11.8 t/h · 最高 17.1 · 最低 5.7
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="sg" style="grid-column:1/-1">
+          <div class="sg-t">Loader 名单管理 <span class="sv-ok" id="sv6">已保存 ✓</span></div>
+          <div style="font-size:10px;color:var(--mt);font-family:var(--mo);margin-bottom:10px;line-height:1.6">修改 Loader 姓名后点击「保存名单」，将影响所有计算和报告。姓名需与 Excel 中 LoaderList 列完全一致。</div>
+          <div id="loaderNameRows" style="display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;margin-bottom:10px"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-s" onclick="addLoaderName()">+ 添加人员</button>
+            <button class="btn btn-s btn-g" onclick="saveLoaderNames()">保存名单</button>
+            <button class="btn btn-s" onclick="resetLoaderNames()">恢复默认</button>
+          </div>
+          <div id="loaderNameMsg" style="font-size:10px;color:var(--gn);font-family:var(--mo);margin-top:6px;display:none"></div>
+        </div>
+      </div>
+      <div class="row" style="justify-content:flex-end;margin-top:12px">
+        <button class="btn btn-p btn-s" onclick="applyRecalc()">应用设置并重算 ↗</button>
+      </div>
+    </div>
+
+    <!-- PDF -->
+    <div class="pnl" id="p-pdf">
+      <div id="pdfTable" style="margin-bottom:12px"></div>
+      <div style="border:1px solid var(--bd);border-radius:10px;overflow:hidden;margin-bottom:12px">
+        <div style="background:var(--sf2);padding:9px 12px;font-size:11px;font-weight:500;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;font-family:var(--mo)">
+          <span style="color:var(--mt)">NOTICE PREVIEW</span>
+          <select id="prevP" onchange="renderPreview()" style="padding:3px 7px;background:var(--bg);border:1px solid var(--bd);border-radius:4px;color:var(--tx);font-size:10px;font-family:var(--mo)"></select>
+        </div>
+        <div style="padding:12px"><div class="nv" id="noticePrev"></div></div>
+      </div>
+      <div class="row" style="justify-content:flex-end">
+        <button class="btn btn-s" onclick="exportReport()">导出完整报告 (Excel)</button>
+        <button class="btn btn-s btn-p" onclick="exportNoticePDF(false)">打印当前 Notice → PDF</button>
+        <button class="btn btn-g btn-s" onclick="exportNoticePDF(true)">打印全部人员 → PDF</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+let KNOWN=['Geo Casper Chong','Shengchih Hung','Tuan Tran','Xingjiang Xu','Yubiao Wu','ZhiGang Deng','Tingyi Xie'];
+const AVTS=[['#14532d','#86efac'],['#1e3a5f','#93c5fd'],['#78350f','#fcd34d'],['#3f0f0f','#fca5a5'],['#2e1065','#c4b5fd'],['#374151','#9ca3af'],['#4c0519','#fda4af']];
+const TIMES=[10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,160,170,180,190,200,210,220];
+const WTS=Array.from({length:25},(_,i)=>i+1);
+const DEF_ST={
+  1:{10:1.0,20:0.9,30:0.8},
+  2:{10:1.0,20:0.9,30:0.8},
+  3:{10:1.0,20:0.9,30:0.8},
+  4:{20:1.0,30:0.9,40:0.8},
+  5:{20:1.0,30:0.9,40:0.8},
+  6:{20:1.0,30:1.0,40:0.9,50:0.8},
+  7:{20:1.0,30:1.0,40:0.9,50:0.8},
+  8:{20:1.0,30:1.0,40:0.9,50:0.8},
+  9:{20:1.0,30:1.0,40:0.9,50:0.8},
+  10:{20:1.0,30:1.0,40:1.0,50:0.9,60:0.8},
+  11:{20:1.0,30:1.0,40:1.0,50:0.9,60:0.8},
+  12:{20:1.0,30:1.0,40:1.0,50:0.9,60:0.8},
+  13:{20:1.0,30:1.0,40:1.0,50:1.0,60:0.9,70:0.8},
+  14:{20:1.0,30:1.0,40:1.0,50:1.0,60:0.9,70:0.8},
+  15:{20:1.1,30:1.0,40:1.0,50:1.0,60:0.9,70:0.8},
+  16:{30:1.1,40:1.0,50:1.0,60:1.0,70:0.9,80:0.8},
+  17:{30:1.1,40:1.0,50:1.0,60:1.0,70:0.9,80:0.8},
+  18:{30:1.2,40:1.1,50:1.0,60:1.0,70:1.0,80:0.9,90:0.8},
+  19:{30:1.2,40:1.1,50:1.0,60:1.0,70:1.0,80:0.9,90:0.8},
+  20:{30:1.2,40:1.2,50:1.1,60:1.0,70:1.0,80:1.0,90:0.9,100:0.8},
+  21:{30:1.2,40:1.2,50:1.1,60:1.0,70:1.0,80:1.0,90:0.9,100:0.8},
+  22:{30:1.3,40:1.2,50:1.2,60:1.1,70:1.0,80:1.0,90:1.0,100:0.9,110:0.8},
+  23:{30:1.3,40:1.2,50:1.2,60:1.1,70:1.0,80:1.0,90:1.0,100:0.9,110:0.8},
+  24:{30:1.4,40:1.3,50:1.2,60:1.2,70:1.1,80:1.0,90:1.0,100:1.0,110:0.9,120:0.8},
+  25:{30:1.4,40:1.3,50:1.2,60:1.2,70:1.1,80:1.0,90:1.0,100:1.0,110:0.9,120:0.8}
+};
+const DEF_TIERS=[{t:0,c:0.8},{t:60,c:0.8},{t:70,c:0.9},{t:80,c:1.0},{t:90,c:1.1},{t:100,c:1.2}];
+// 效率阶梯：效率 = 有效发货量(t) ÷ 有效工作时间(h)，值越高系数越大
+const DEF_EFF_TIERS=[{e:0,c:0.7},{e:6,c:0.85},{e:8,c:1.0},{e:10,c:1.1},{e:13,c:1.2},{e:15,c:1.3}];
+const LS='loader_bonus_v16';
+
+let STBL={},TIERS=[],EFF_TIERS=[];
+let allRows=[],results=[],dateFrom='',dateTo='',uChart=null,selP=null;
+
+// ── localStorage ──────────────────────────────────────────────────────────
+function ls_load(){try{const r=localStorage.getItem(LS);return r?JSON.parse(r):null;}catch(e){return null;}}
+function ls_save(extra={}){
+  try{
+    const s={c1:gv('c1'),c2:gv('c2'),c3:gv('c3'),amS:gv_s('amS'),amE:gv_s('amE'),pmS:gv_s('pmS'),pmE:gv_s('pmE'),maxPool:gv('maxPool'),wEff:gv('wEff'),wDiff:gv('wDiff'),minCombined:gv('minCombined'),tiers:TIERS,effTiers:EFF_TIERS,scoreTable:STBL,loaderNames:KNOWN,...extra};
+    localStorage.setItem(LS,JSON.stringify(s));
+    flashSI();
+  }catch(e){}
+}
+function saveSetting(k,v){try{const s=ls_load()||{};s[k]=v;localStorage.setItem(LS,JSON.stringify(s));flashSI();}catch(e){}}
+function applyLS(){
+  const s=ls_load();if(!s)return false;
+  if(s.c1)document.getElementById('c1').value=s.c1;
+  if(s.c2)document.getElementById('c2').value=s.c2;
+  if(s.c3){const v=parseFloat(s.c3);document.getElementById('c3').value=(v<=0.8||v===1.2?1.0:v);}
+  if(s.amS)document.getElementById('amS').value=s.amS;
+  if(s.amE)document.getElementById('amE').value=s.amE;
+  if(s.pmS)document.getElementById('pmS').value=s.pmS;
+  if(s.pmE)document.getElementById('pmE').value=s.pmE;
+  if(s.maxPool)document.getElementById('maxPool').value=s.maxPool;
+  if(s.wEff)document.getElementById('wEff').value=s.wEff;
+  if(s.wDiff)document.getElementById('wDiff').value=s.wDiff;
+  if(s.minCombined)document.getElementById('minCombined').value=s.minCombined;
+  if(s.loaderNames&&Array.isArray(s.loaderNames)&&s.loaderNames.length>0)KNOWN=[...s.loaderNames];
+  if(s.tiers&&s.tiers.length)TIERS=[...s.tiers];
+  if(s.effTiers&&s.effTiers.length)EFF_TIERS=[...s.effTiers];
+  // Restore scoreTable: only if saved under current LS key (v8+) to avoid old data
+  if(s.scoreTable&&Object.keys(s.scoreTable).length===25){
+    // Validate structure: must have 25 weight rows with numeric entries
+    const valid=Object.values(s.scoreTable).every(row=>row&&typeof row==='object'&&Object.keys(row).length>0);
+    if(valid)STBL=JSON.parse(JSON.stringify(s.scoreTable));
+  }
+  return true;
+}
+function flashSI(){const el=document.getElementById('si');el.classList.add('on');setTimeout(()=>el.classList.remove('on'),2000);}
+function showSaved(id){const el=document.getElementById(id);if(!el)return;el.classList.add('on');setTimeout(()=>el.classList.remove('on'),2000);}
+function updateCapLabels(){
+  const v=document.getElementById('maxPool').value;
+  document.getElementById('capLabel').textContent=v;
+  document.querySelectorAll('[id="capFL"]').forEach(el=>el.textContent=v);
+  document.querySelectorAll('.cap-lbl').forEach(el=>el.textContent=v);
+  updateFormulaDisplay();
+}
+function updateFormulaDisplay(){
+  const we=(parseFloat(document.getElementById('wEff').value)||1.0).toFixed(2).replace(/\.?0+$/,'');
+  const wd=(parseFloat(document.getElementById('wDiff').value)||1.0).toFixed(2).replace(/\.?0+$/,'');
+  const mc=(parseFloat(document.getElementById('minCombined').value)||1.0).toFixed(2).replace(/\.?0+$/,'');
+  ['wEffLbl','wEffDisp','wEffFL'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=we;});
+  ['wDiffLbl','wDiffDisp','wDiffFL'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=wd;});
+  ['minCombLbl','minCombDisp','minCombFL'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=mc;});
+}
+function getMinCombined(){return parseFloat(document.getElementById('minCombined').value)||1.0;}
+
+// ── Nav ───────────────────────────────────────────────────────────────────
+function gT(n,el){
+  document.querySelectorAll('.ni2').forEach(t=>t.classList.remove('act'));
+  document.querySelectorAll('.pnl').forEach(p=>p.classList.remove('act'));
+  if(el)el.classList.add('act');
+  document.getElementById('p-'+n).classList.add('act');
+  if(n==='ranking')renderRanking();
+  if(n==='persons')renderPersonCards();
+  if(n==='trucks')renderTrucks();
+  if(n==='shift')renderShift();
+  if(n==='pdf')renderPDF();
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function gv(id){return+document.getElementById(id).value;}
+function gv_s(id){return document.getElementById(id).value;}
+function getMaxPool(){return gv('maxPool')||8;}
+
+function parseL(raw){
+  if(!raw||String(raw)==='nan')return[];
+  const s=String(raw);const f=[];let rem=s;
+  for(const n of KNOWN){if(rem.includes(n)){f.push(n);rem=rem.split(n).join(' ');}}
+  for(const p of rem.replace(/\n/g,'  ').split('  ')){const t=p.trim();if(t&&!f.includes(t))f.push(t);}
+  return f;
+}
+function toDate(v){
+  if(!v&&v!==0)return null;
+  var d;
+  if(typeof v==='number'){
+    // Excel serial number (cellDates:false) - no timezone issues
+    d=new Date((v-25569)*86400*1000);
+  } else if(typeof v==='string'){
+    // String date like "2026-03-19" or "19/03/2026"
+    d=new Date(v);
+  } else if(v&&v.getTime){
+    d=v;
+  } else return null;
+  if(!d||isNaN(d))return null;
+  var yy=d.getUTCFullYear();
+  var mm=String(d.getUTCMonth()+1).padStart(2,'0');
+  var dd=String(d.getUTCDate()).padStart(2,'0');
+  return yy+'-'+mm+'-'+dd;
+}
+function getMins(s,f){if(!s||!f)return null;if(typeof s==='number'&&typeof f==='number')return Math.round((f-s)*1440);if(s&&s.getTime)return Math.round((f-s)/60000);return null;}
+function tmM(s){const[h,m]=(s||'00:00').split(':').map(Number);return h*60+(m||0);}
+function getShift(v){
+  if(!v&&v!==0)return'OTHER';
+  var cur;
+  if(typeof v==='number'){
+    // Excel serial: integer=date, decimal=time. Extract time portion.
+    cur=Math.round(((v%1)+1)%1*1440); // handles negative fractions too
+  } else if(v&&v.getTime){
+    // Date object - use local hours (Excel stores local time)
+    cur=v.getHours()*60+v.getMinutes();
+  } else return'OTHER';
+  const aS=tmM(gv_s('amS')),aE=tmM(gv_s('amE')),pS=tmM(gv_s('pmS')),pE=tmM(gv_s('pmE'));
+  if(cur>=aS&&cur<aE)return'AM';if(cur>=pS&&cur<pE)return'PM';return'OTHER';
+}
+function wkKey(ds){if(!ds)return'';const d=new Date(ds),dy=d.getDay()||7;const m=new Date(d);m.setDate(d.getDate()-dy+1);return m.toISOString().split('T')[0];}
+function getTier(t){let c=0;for(const x of[...TIERS].sort((a,b)=>a.t-b.t)){if(t>=x.t)c=x.c;}return c;}
+// 效率系数：效率(t/h) 查效率阶梯
+function getEffTier(tph){let c=1.0;for(const x of[...EFF_TIERS].sort((a,b)=>a.e-b.e)){if(tph>=x.e)c=x.c;}return c;}
+
+// ── Score table ───────────────────────────────────────────────────────────
+function vCls(v){if(v===null||v===undefined)return'v0';const r=Math.round(v*100);if(r===100)return'v1';if(r===90)return'v09';if(r===80)return'v08';if(r>0)return'vX';return'v0';}
+function fmtV(v){if(v===null||v===undefined)return'';return String(parseFloat(v.toFixed(4)));}
+function getBS(kg,min){
+  if(min===null||min<0)return 0;
+  const w=Math.max(1,Math.min(25,Math.round(kg/1000)));
+  const row=STBL[w];if(!row)return 0;
+  for(const t of Object.keys(row).map(Number).sort((a,b)=>a-b)){if(min<=t)return row[t];}
+  return 0;
+}
+function buildGrid(){
+  const wrap=document.getElementById('sgWrap');const tbl=document.createElement('table');tbl.className='sg';
+  const thead=tbl.createTHead(),hr=thead.insertRow();
+  const th0=document.createElement('th');th0.textContent='重量＼时间';hr.appendChild(th0);
+  TIMES.forEach(t=>{const th=document.createElement('th');th.textContent=t;hr.appendChild(th);});
+  const tbody=tbl.createTBody();
+  WTS.forEach(w=>{
+    const tr=tbody.insertRow();
+    const rh=document.createElement('td');rh.className='rh';rh.textContent=w+'吨';tr.appendChild(rh);
+    TIMES.forEach(t=>{
+      const v=(STBL[w]&&STBL[w][t]!==undefined)?STBL[w][t]:null;
+      const td=document.createElement('td');td.className='sc '+vCls(v);td.dataset.w=w;td.dataset.t=t;
+      const lb=document.createElement('span');lb.className='lb';lb.textContent=fmtV(v);td.appendChild(lb);
+      const inp=document.createElement('input');inp.type='text';inp.value=fmtV(v);inp.dataset.w=w;inp.dataset.t=t;inp.setAttribute('inputmode','decimal');
+      inp.addEventListener('focus',function(){const ww=+this.dataset.w,tt=+this.dataset.t;const cur=(STBL[ww]&&STBL[ww][tt]!==undefined)?STBL[ww][tt]:null;this.value=cur!==null?fmtV(cur):'';this.select();});
+      inp.addEventListener('blur',function(){commitCell(this);ls_save();});
+      inp.addEventListener('keydown',function(e){
+        if(e.key==='Enter'||e.key==='Tab'){e.preventDefault();commitCell(this);moveFocus(this,e.key==='Enter'?1:0,(e.key==='Tab'&&e.shiftKey)?-1:1);}
+        else if(e.key==='ArrowRight'){commitCell(this);moveFocus(this,0,1);}
+        else if(e.key==='ArrowLeft'){commitCell(this);moveFocus(this,0,-1);}
+        else if(e.key==='ArrowDown'){e.preventDefault();commitCell(this);moveFocus(this,1,0);}
+        else if(e.key==='ArrowUp'){e.preventDefault();commitCell(this);moveFocus(this,-1,0);}
+      });
+      td.appendChild(inp);tr.appendChild(td);
+    });
+  });
+  wrap.innerHTML='';wrap.appendChild(tbl);
+}
+function commitCell(inp){
+  const w=+inp.dataset.w,t=+inp.dataset.t;const raw=inp.value.trim();
+  const td=inp.parentElement;const lb=td.querySelector('.lb');
+  if(raw===''||raw==='0'){if(STBL[w])delete STBL[w][t];lb.textContent='';td.className='sc v0';}
+  else{const v=parseFloat(raw);if(isNaN(v)||v<0){const cur=(STBL[w]&&STBL[w][t]!==undefined)?STBL[w][t]:null;inp.value=fmtV(cur);return;}if(!STBL[w])STBL[w]={};STBL[w][t]=v;lb.textContent=fmtV(v);td.className='sc '+vCls(v);}
+  inp.value=lb.textContent;
+}
+function moveFocus(inp,dr,dc){const w=+inp.dataset.w,t=+inp.dataset.t;const wi=WTS.indexOf(w),ti=TIMES.indexOf(t);const nw=WTS[wi+dr],nt=TIMES[ti+dc];if(!nw||!nt)return;const next=document.querySelector(`#sgWrap input[data-w="${nw}"][data-t="${nt}"]`);if(next)next.focus();}
+function resetST(){STBL=JSON.parse(JSON.stringify(DEF_ST));buildGrid();ls_save();}
+
+// ── Tiers ─────────────────────────────────────────────────────────────────
+function renderTiers(){
+  const s=[...TIERS].sort((a,b)=>a.t-b.t);
+  document.getElementById('tierRows').innerHTML=s.map((x,i)=>`<div class="tr-r">发货 ≥ <input type="number" class="ni" value="${x.t}" min="0" step="5" style="width:52px" onchange="updT(${i},'t',this.value)"> 吨 → 系数 <input type="number" class="ni" value="${x.c}" min="0" max="3" step="0.05" style="width:52px" onchange="updT(${i},'c',this.value)">${i>0?`<button class="btn btn-s" onclick="delT(${i})" style="color:var(--rd)">✕</button>`:'<span style="color:#374151">（基础）</span>'}</div>`).join('');
+}
+function updT(i,k,v){const s=[...TIERS].sort((a,b)=>a.t-b.t);s[i][k]=+v;TIERS=s;ls_save();showSaved('sv4');recalcAll();}
+function addTier(){TIERS.push({t:TIERS[TIERS.length-1].t+10,c:1});renderTiers();ls_save();recalcAll();}
+function delT(i){const s=[...TIERS].sort((a,b)=>a.t-b.t);s.splice(i,1);TIERS=s;renderTiers();ls_save();recalcAll();}
+
+// ── Efficiency Tiers ──────────────────────────────────────────────────────
+function renderEffTiers(){
+  const s=[...EFF_TIERS].sort((a,b)=>a.e-b.e);
+  document.getElementById('effTierRows').innerHTML=s.map((x,i)=>`<div class="tr-r">效率 ≥ <input type="number" class="ni" value="${x.e}" min="0" step="0.5" style="width:52px" onchange="updET(${i},'e',this.value)"> t/h → 系数 <input type="number" class="ni" value="${x.c}" min="0" max="3" step="0.05" style="width:52px" onchange="updET(${i},'c',this.value)">${i>0?`<button class="btn btn-s" onclick="delET(${i})" style="color:var(--rd)">✕</button>`:'<span style="color:#374151">（基础）</span>'}</div>`).join('');
+}
+function updET(i,k,v){const s=[...EFF_TIERS].sort((a,b)=>a.e-b.e);s[i][k]=+v;EFF_TIERS=s;ls_save();showSaved('sv5');recalcAll();}
+function addEffTier(){EFF_TIERS.push({e:EFF_TIERS[EFF_TIERS.length-1].e+2,c:1});renderEffTiers();ls_save();recalcAll();}
+function delET(i){const s=[...EFF_TIERS].sort((a,b)=>a.e-b.e);s.splice(i,1);EFF_TIERS=s;renderEffTiers();ls_save();recalcAll();}
+
+// ── Calculation ───────────────────────────────────────────────────────────
+function calcAll(){
+  const MAX=getMaxPool();
+  const wEff=parseFloat(document.getElementById('wEff').value)||1.0;
+  const wDiff=parseFloat(document.getElementById('wDiff').value)||1.0;
+  const minComb=getMinCombined();
+
+  // Step 1: valid tonnage per day-shift (for发货量 tier)
+  const dst={};
+  allRows.forEach(r=>{if(!r.valid)return;const k=r.date+'|'+r.shift;dst[k]=(dst[k]||0)+r.weight/1000;});
+
+  // Step 2: 效率 = 有效发货量(t) ÷ 有效工作时间(h)，用首车→末车时长
+  // KEY FIX: use startDate (actual LoadingStart date) not Date_ for grouping
+  // because some records have Date_=next day but LoadingStart=actual shift day
+  // Also use the integer floor of the serial number (same calendar day) to avoid cross-day spans
+  const spanMap={}; // key -> {minS, maxE, ton}
+  allRows.forEach(r=>{
+    if(!r.valid||!r.startR||typeof r.startR!=='number'||r.startR<=0)return;
+    // Use the actual date from LoadingStart serial, grouped by integer day + shift
+    const dayInt=Math.floor(r.startR); // same integer = same calendar day guaranteed
+    const k=dayInt+'|'+r.shift;
+    if(!spanMap[k])spanMap[k]={minS:r.startR,maxE:r.finishR||r.startR,ton:0,date:r.date,shift:r.shift};
+    if(r.startR<spanMap[k].minS)spanMap[k].minS=r.startR;
+    if(r.finishR&&typeof r.finishR==='number'&&r.finishR>r.startR&&r.finishR>spanMap[k].maxE)spanMap[k].maxE=r.finishR;
+    spanMap[k].ton+=(r.weight/1000);
+  });
+  // Also build a lookup from date|shift → dayInt|shift key (for the existing dst/tier keys)
+  const dateShiftToSpanKey={};
+  Object.keys(spanMap).forEach(k=>{
+    const s=spanMap[k];
+    const dsKey=s.date+'|'+s.shift;
+    // If multiple span keys map to same date|shift, keep the one with most tonnage
+    if(!dateShiftToSpanKey[dsKey]||spanMap[dateShiftToSpanKey[dsKey]].ton<s.ton){
+      dateShiftToSpanKey[dsKey]=k;
+    }
+  });
+  // Compute efficiency t/h per day-shift
+  const effTierMap={}; // date|shift key -> effTier coef
+  const tphMap={};     // date|shift key -> t/h value (for display)
+  Object.keys(spanMap).forEach(k=>{
+    const {minS,maxE,ton,date,shift}=spanMap[k];
+    const spanH=(maxE-minS)*24; // serial fraction * 24 = hours
+    const dsKey=date+'|'+shift;
+    if(spanH<=0||spanH>14){effTierMap[dsKey]=1.0;tphMap[dsKey]=null;return;}
+    const tph=ton/spanH;
+    tphMap[dsKey]=Math.round(tph*100)/100;
+    effTierMap[dsKey]=getEffTier(tph);
+  });
+  // expose for renderShift
+  calcAll._tphMap=tphMap;
+  calcAll._effTierMap=effTierMap;
+
+  // Step 3: per-truck bonus
+  allRows.forEach(r=>{
+    const lc={1:gv('c1'),2:gv('c2'),3:gv('c3')}[Math.min(3,r.numL)]||1;
+    const k=r.date+'|'+r.shift;
+    const tier=getTier(dst[k]||0);
+    const effC=effTierMap[k]||1.0; // 效率系数
+    const finalTier=tier*effC;     // 最终班次系数 = 发货量系数 × 效率系数
+    const wt=r.weight/1000;
+    const combined=(r.bs*wEff+r.ds*wDiff)*finalTier*lc;
+    const eligible=r.valid&&combined>=minComb;
+    const rawPool=eligible?wt*combined:0;
+    // ── Per-person cap: each loader gets at most MAX from this truck ──
+    const rawPP=r.numL?rawPool/r.numL:0;   // per-person before cap
+    const pp=Math.min(rawPP,MAX);           // cap applied per person
+    const pool=pp*(r.numL||1);              // actual total pool after cap
+    r._lc=lc; r._tier=tier; r._effC=effC; r._finalTier=finalTier;
+    r._combined=combined; r._rawPool=rawPool; r._pool=pool;
+    r._capped=eligible&&rawPP>MAX;          // only capped if each person exceeds limit
+    r._eligible=eligible;
+    r._pp=pp;
+  });
+
+  const p={};KNOWN.forEach(n=>p[n]={tot:0,eb:0,db:0,tr:0,tr_elig:0,wt:0,bs:[],ds:[],tm:[],at:0,pt:0,aw:0,pw:0});
+  allRows.forEach(r=>{
+    if(!r.valid||!r.numL)return;
+    // 效率奖金 = 效率分贡献部分；难度奖金 = 难度分贡献部分
+    const vTotal=r.bs+r.ds;
+    const ep=vTotal>0&&r._eligible?r._pp*(r.bs/vTotal):0;
+    const dp=vTotal>0&&r._eligible?r._pp*(r.ds/vTotal):0;
+    for(const l of r.loaders){
+      if(!p[l])continue;const x=p[l];
+      x.tot+=r._pp;x.eb+=ep;x.db+=dp;
+      x.tr++;if(r._eligible)x.tr_elig++;
+      x.wt+=r.weight/1000;
+      x.bs.push(r.bs);x.ds.push(r.ds);
+      if(r.minutes&&r.minutes>0)x.tm.push(r.minutes);
+      if(r.shift==='AM'){x.at++;x.aw+=r.weight/1000;}if(r.shift==='PM'){x.pt++;x.pw+=r.weight/1000;}
+    }
+  });
+  results=KNOWN.map(name=>{
+    const x=p[name];
+    const ab=x.bs.length?x.bs.reduce((a,b)=>a+b,0)/x.bs.length:0;
+    const td=x.ds.reduce((a,b)=>a+b,0);
+    const at=x.tm.length?x.tm.reduce((a,b)=>a+b,0)/x.tm.length:0;
+    // Per-person average shift efficiency: average tph across their shifts
+    const myShiftKeys=[...new Set(allRows.filter(r=>r.valid&&r.loaders.includes(name)).map(r=>r.date+'|'+r.shift))];
+    const tphVals=myShiftKeys.map(k=>calcAll._tphMap&&calcAll._tphMap[k]).filter(v=>v!=null&&v>0&&v<50);
+    const avg_tph=tphVals.length?Math.round(tphVals.reduce((a,b)=>a+b,0)/tphVals.length*10)/10:null;
+    return{name,total:Math.round(x.tot*100)/100,eb:Math.round(x.eb*100)/100,db:Math.round(x.db*100)/100,trucks:x.tr,trucks_elig:x.tr_elig,weight:Math.round(x.wt*100)/100,avg_basic:Math.round(ab*1000)/1000,total_diff:Math.round(td*100)/100,avg_diff:Math.round((x.tr?td/x.tr:0)*100)/100,avg_time:Math.round(at*10)/10,at:x.at,pt:x.pt,aw:Math.round(x.aw*100)/100,pw:Math.round(x.pw*100)/100,avg_tph,rank:0};
+  }).sort((a,b)=>b.total-a.total);
+  results.forEach((r,i)=>r.rank=i+1);
+}
+
+// ── File loading ──────────────────────────────────────────────────────────
+function loadFile(file){
+  if(!file)return;
+  const msg=document.getElementById('upMsg');msg.textContent='正在解析...';msg.className='msg';
+  const rd=new FileReader();
+  rd.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array',cellDates:false});
+      const sh=wb.Sheets[wb.SheetNames[0]];
+      const raw=XLSX.utils.sheet_to_json(sh,{header:1,raw:false});
+      const rawN=XLSX.utils.sheet_to_json(sh,{header:1,raw:true});
+      const hdr=raw[0]||[];const idx={};hdr.forEach((h,i)=>{if(h)idx[String(h).trim()]=i;});
+      allRows=[];
+      for(let r=1;r<raw.length;r++){
+        const d=raw[r],dn=rawN[r];if(!d||d.length<3)continue;
+        const date=toDate(dn?dn[idx['Date_']]:null);if(!date)continue;
+        const weight=parseFloat(d[idx['TotalWeight']])||0;
+        const numL=parseInt(d[idx['Numof_Loaders']])||2;
+        const valid=parseInt(d[idx['Is_Valid']]||'0')===1;
+        const loaders=parseL(d[idx['LoaderList']]);
+        const sr=dn?dn[idx['LoadingStart']]:null,fr=dn?dn[idx['LoadingFinish']]:null;
+        // Use rawN (raw:true numeric) for TimeSpent - Excel stores duration as fraction of day
+        // raw:false formats it as "6:42:00" (total hours:min:sec) which is misleading
+        const tsRawN=dn?dn[idx['TimeSpent']]:null;
+        const tsRawS=d[idx['TimeSpent']]; // string version as fallback
+        let minutes=null;
+        if(tsRawN!==null&&tsRawN!==undefined&&tsRawN!==''){
+          if(typeof tsRawN==='number'&&tsRawN>=0){
+            // Direct fraction of day: multiply by 1440 to get minutes
+            minutes=Math.round(tsRawN*1440);
+          }
+        }
+        if(minutes===null&&tsRawS&&String(tsRawS).trim()!==''){
+          // Fallback: parse string - handle "0 days 00:42:28" format only
+          const ts=String(tsRawS);
+          const m1=ts.match(/(\d+)\s+days?\s+(\d+):(\d+):(\d+)/);
+          if(m1) minutes=parseInt(m1[1])*1440+parseInt(m1[2])*60+parseInt(m1[3])+(parseInt(m1[4])>=30?1:0);
+        }
+        // Last resort: compute from LoadingStart/Finish serial numbers
+        if(minutes===null) minutes=getMins(sr,fr);
+        // Sanity check: cap at 300 min (5 hours), anything above is likely data error
+        if(minutes!==null&&minutes>300) minutes=null;
+        const shift=getShift(sr);
+        const bs=getBS(weight,minutes);
+        const ds=(parseFloat(d[idx['Point_12m']])||0)+(parseFloat(d[idx['Point_Machines']])||0)+(parseFloat(d[idx['Point_Mesh']])||0)+(parseFloat(d[idx['Point_Orders']])||0)+(parseFloat(d[idx['Point_Projects']])||0);
+        const truck=d[idx['TruckName']]||'';
+        // Reconstruct finishR reliably: startR + minutes/1440
+        // This avoids depending on LoadingFinish being present, and ensures same-day accuracy
+        const frCalc=(typeof sr==='number'&&sr>0&&minutes!==null&&minutes>0)?(sr+minutes/1440):fr;
+        allRows.push({date,startDate:toDate(sr),week:wkKey(date),weight,numL,valid,loaders,minutes,shift,bs,ds,startR:sr,finishR:frCalc,truck,_lc:1,_tier:0,_combined:0,_rawPool:0,_pool:0,_capped:false,_pp:0});
+      }
+      const dates=allRows.map(r=>r.date).filter(Boolean).sort();
+      dateFrom=dates[0]||'';dateTo=dates[dates.length-1]||'';
+      calcAll();populateFilters();renderUpStats();renderUpChart();
+      const vc=allRows.filter(r=>r.valid).length,ic=allRows.length-vc;
+      const capped=allRows.filter(r=>r._capped).length;
+      const elig=allRows.filter(r=>r.valid&&r._eligible).length;
+      const inelig=allRows.filter(r=>r.valid&&!r._eligible).length;
+      msg.textContent=`✓ ${allRows.length} 条记录 · 有效 ${vc} · 无效 ${ic} · 有奖 ${elig}台 · 无奖(综合<1) ${inelig}台 · ${capped} 台触发上限 · ${dateFrom} ~ ${dateTo}`;
+      msg.className='msg ok';
+      document.getElementById('upSum').style.display='block';
+    }catch(ex){msg.textContent='✗ 解析失败：'+ex.message;msg.className='msg er';console.error(ex);}
+  };rd.readAsArrayBuffer(file);
+}
+
+function recalcAll(){
+  if(!allRows.length)return;
+  allRows.forEach(r=>{r.shift=getShift(r.startR);r.bs=getBS(r.weight,r.minutes);});
+  calcAll();renderUpStats();renderUpChart();renderRanking();renderPersonCards();renderTrucks();renderShift();
+}
+function applyRecalc(){recalcAll();gT('ranking',document.querySelectorAll('.ni2')[1]);}
+
+function populateFilters(){
+  const dates=[...new Set(allRows.map(r=>r.date).filter(Boolean))].sort();
+  const loaders=[...new Set(allRows.flatMap(r=>r.loaders))].sort();
+  const weeks=[...new Set(allRows.map(r=>r.week).filter(Boolean))].sort();
+  ['trDate'].forEach(id=>{const el=document.getElementById(id);el.innerHTML='<option value="">所有日期</option>';dates.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;el.appendChild(o);});});
+  const tl=document.getElementById('trLoader');tl.innerHTML='<option value="">所有人员</option>';loaders.forEach(l=>{const o=document.createElement('option');o.value=l;o.textContent=l;tl.appendChild(o);});
+  const sw=document.getElementById('swk');sw.innerHTML='<option value="">所有周次</option>';weeks.forEach(w=>{const o=document.createElement('option');o.value=w;o.textContent='周 '+w;sw.appendChild(o);});
+}
+
+// ── Render: Upload stats ──────────────────────────────────────────────────
+function renderUpStats(){
+  let tW=0,aW=0,pW=0;const dates=new Set();
+  allRows.filter(r=>r.valid).forEach(r=>{tW+=r.weight;if(r.shift==='AM')aW+=r.weight;if(r.shift==='PM')pW+=r.weight;dates.add(r.date);});
+  const tB=results.reduce((a,r)=>a+r.total,0);const days=Math.max(1,dates.size);
+  const capped=allRows.filter(r=>r._capped).length;
+  const eligible=allRows.filter(r=>r.valid&&r._eligible).length;
+  const ineligible=allRows.filter(r=>r.valid&&!r._eligible).length;
+
+  // Overall avg loading times
+  const amTimes=allRows.filter(r=>r.valid&&r.shift==='AM'&&r.minutes>0&&r.minutes<=300).map(r=>r.minutes);
+  const pmTimes=allRows.filter(r=>r.valid&&r.shift==='PM'&&r.minutes>0&&r.minutes<=300).map(r=>r.minutes);
+  const amAvg=amTimes.length?(amTimes.reduce((a,b)=>a+b,0)/amTimes.length).toFixed(1):'—';
+  const pmAvg=pmTimes.length?(pmTimes.reduce((a,b)=>a+b,0)/pmTimes.length).toFixed(1):'—';
+
+  // Per-shift daily avg weight
+  const amDays=new Set(allRows.filter(r=>r.valid&&r.shift==='AM').map(r=>r.date)).size||1;
+  const pmDays=new Set(allRows.filter(r=>r.valid&&r.shift==='PM').map(r=>r.date)).size||1;
+  const amDailyW=(aW/1000/amDays).toFixed(1);
+  const pmDailyW=(pW/1000/pmDays).toFixed(1);
+
+  // Compute average shift efficiency (t/h) for AM and PM using tphMap
+  const tphMap=calcAll._tphMap||{};
+  const amTphs=Object.entries(tphMap).filter(([k,v])=>k.endsWith('|AM')&&v!=null&&v>0).map(([,v])=>v);
+  const pmTphs=Object.entries(tphMap).filter(([k,v])=>k.endsWith('|PM')&&v!=null&&v>0).map(([,v])=>v);
+  const amAvgTph=amTphs.length?(amTphs.reduce((a,b)=>a+b,0)/amTphs.length).toFixed(1):'—';
+  const pmAvgTph=pmTphs.length?(pmTphs.reduce((a,b)=>a+b,0)/pmTphs.length).toFixed(1):'—';
+  const amTphColor=amAvgTph==='—'?'var(--mt)':parseFloat(amAvgTph)>=13?'var(--gn)':parseFloat(amAvgTph)>=8?'var(--am)':'var(--rd)';
+  const pmTphColor=pmAvgTph==='—'?'var(--mt)':parseFloat(pmAvgTph)>=13?'var(--gn)':parseFloat(pmAvgTph)>=8?'var(--am)':'var(--rd)';
+
+  document.getElementById('upSt').innerHTML=`
+    <div class="sc g"><div class="sl">有效发货量</div><div class="sv">${(tW/1000).toFixed(0)}<span style="font-size:12px">t</span></div><div class="ss">日均 ${(tW/1000/days).toFixed(1)} 吨 · 有奖${eligible}台</div></div>
+    <div class="sc b">
+      <div class="sl">早班 AM</div>
+      <div class="sv">${(aW/1000).toFixed(0)}<span style="font-size:12px">t</span></div>
+      <div class="ss">日均 <strong style="color:#60a5fa">${amDailyW}t</strong> · 均装车 <strong style="color:var(--gn)">${amAvg}分</strong></div>
+    </div>
+    <div class="sc a">
+      <div class="sl">下午班 PM</div>
+      <div class="sv">${(pW/1000).toFixed(0)}<span style="font-size:12px">t</span></div>
+      <div class="ss">日均 <strong style="color:#fcd34d">${pmDailyW}t</strong> · 均装车 <strong style="color:var(--am)">${pmAvg}分</strong></div>
+    </div>
+    <div class="sc" style="border-left:3px solid var(--gn);background:var(--sf)">
+      <div class="sl">均装载效率</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px">
+        <div>
+          <div style="font-size:9px;color:#60a5fa;font-family:var(--mo);margin-bottom:1px">AM 早班</div>
+          <div style="font-size:18px;font-weight:600;font-family:var(--mo);color:${amTphColor}">${amAvgTph}<span style="font-size:10px"> t/h</span></div>
+        </div>
+        <div>
+          <div style="font-size:9px;color:#fcd34d;font-family:var(--mo);margin-bottom:1px">PM 下午班</div>
+          <div style="font-size:18px;font-weight:600;font-family:var(--mo);color:${pmTphColor}">${pmAvgTph}<span style="font-size:10px"> t/h</span></div>
+        </div>
+      </div>
+      <div class="ss" style="margin-top:3px">发货量÷首末车时长 · 越高越好</div>
+    </div>`;
+  renderEffStats([...dates].sort());
+}
+
+function minsToHHMM(m){
+  if(m===null||m===undefined) return '—';
+  const h=Math.floor(m/60), mm=m%60;
+  return h+'h'+String(mm).padStart(2,'0')+'m';
+}
+
+function renderEffStats(dates){
+  const el=document.getElementById('effStats');if(!el)return;
+  if(!dates.length){el.innerHTML='';return;}
+
+  // Collect per-day stats for period averages
+  const amStats=[], pmStats=[];
+  let rows='';
+
+  dates.forEach(date=>{
+    const as=getShiftStats(date,'AM'), ps=getShiftStats(date,'PM');
+    if(as) amStats.push(as);
+    if(ps) pmStats.push(ps);
+
+    const amAvgTimes = as&&as.avgTime!==null ? as.avgTime : null;
+    const pmAvgTimes = ps&&ps.avgTime!==null ? ps.avgTime : null;
+    const amUtil = as&&as.workMins!=null ? (as.workMins/480*100).toFixed(0)+'%' : '—';
+    const pmUtil = ps&&ps.workMins!=null ? (ps.workMins/480*100).toFixed(0)+'%' : '—';
+    const amAvgColor = amAvgTimes ? (amAvgTimes<30?'var(--gn)':amAvgTimes<50?'var(--am)':'var(--rd)') : 'var(--mt)';
+    const pmAvgColor = pmAvgTimes ? (pmAvgTimes<30?'var(--gn)':pmAvgTimes<50?'var(--am)':'var(--rd)') : 'var(--mt)';
+
+    rows+=`<tr>
+      <td class="tl" rowspan="2" style="font-size:11px;font-weight:600;font-family:var(--mo);vertical-align:middle">${date}</td>
+      <td><span class="bdg bam">AM</span></td>
+      <td style="font-family:var(--mo);font-size:10px;color:var(--mt)">${as?as.workStart||'—':'—'}</td>
+      <td style="font-family:var(--mo);font-size:10px;color:var(--mt)">${as?as.workEnd||'—':'—'}</td>
+      <td style="font-family:var(--mo)">${as&&as.workMins!=null?minsToHHMM(as.workMins):'—'}</td>
+      <td style="font-weight:600;font-family:var(--mo);color:${amAvgColor}">${amAvgTimes!==null?amAvgTimes+'分':'—'}</td>
+      <td style="font-family:var(--mo)">${as?as.n:'—'}</td>
+      <td style="font-family:var(--mo);color:var(--gn)">${amUtil}</td>
+    </tr><tr>
+      <td><span class="bdg bpm">PM</span></td>
+      <td style="font-family:var(--mo);font-size:10px;color:var(--mt)">${ps?ps.workStart||'—':'—'}</td>
+      <td style="font-family:var(--mo);font-size:10px;color:var(--mt)">${ps?ps.workEnd||'—':'—'}</td>
+      <td style="font-family:var(--mo)">${ps&&ps.workMins!=null?minsToHHMM(ps.workMins):'—'}</td>
+      <td style="font-weight:600;font-family:var(--mo);color:${pmAvgColor}">${pmAvgTimes!==null?pmAvgTimes+'分':'—'}</td>
+      <td style="font-family:var(--mo)">${ps?ps.n:'—'}</td>
+      <td style="font-family:var(--mo);color:var(--am)">${pmUtil}</td>
+    </tr>`;
+  });
+
+  // Period averages
+  const avgWorkAM = amStats.filter(s=>s.workMins!=null).length
+    ? Math.round(amStats.filter(s=>s.workMins!=null).reduce((a,s)=>a+s.workMins,0)/amStats.filter(s=>s.workMins!=null).length) : null;
+  const avgWorkPM = pmStats.filter(s=>s.workMins!=null).length
+    ? Math.round(pmStats.filter(s=>s.workMins!=null).reduce((a,s)=>a+s.workMins,0)/pmStats.filter(s=>s.workMins!=null).length) : null;
+  const avgTimeAM = amStats.filter(s=>s.avgTime!=null).length
+    ? (amStats.filter(s=>s.avgTime!=null).reduce((a,s)=>a+s.avgTime,0)/amStats.filter(s=>s.avgTime!=null).length).toFixed(1) : null;
+  const avgTimePM = pmStats.filter(s=>s.avgTime!=null).length
+    ? (pmStats.filter(s=>s.avgTime!=null).reduce((a,s)=>a+s.avgTime,0)/pmStats.filter(s=>s.avgTime!=null).length).toFixed(1) : null;
+  const avgUtilAM = avgWorkAM!=null ? (avgWorkAM/480*100).toFixed(0)+'%' : '—';
+  const avgUtilPM = avgWorkPM!=null ? (avgWorkPM/480*100).toFixed(0)+'%' : '—';
+
+  // Average start/end times: convert "HH:MM" → minutes, average, convert back
+  function timeStrToMins(t){ if(!t)return null; const[h,m]=t.split(':').map(Number); return h*60+m; }
+  function minsToTimeStr(m){ if(m===null||m===undefined)return'—'; return String(Math.floor(m/60)).padStart(2,'0')+':'+String(Math.round(m%60)).padStart(2,'0'); }
+
+  const amStartMins = amStats.map(s=>timeStrToMins(s.workStart)).filter(v=>v!==null);
+  const amEndMins   = amStats.map(s=>timeStrToMins(s.workEnd)).filter(v=>v!==null);
+  const pmStartMins = pmStats.map(s=>timeStrToMins(s.workStart)).filter(v=>v!==null);
+  const pmEndMins   = pmStats.map(s=>timeStrToMins(s.workEnd)).filter(v=>v!==null);
+
+  const avgStartAM = amStartMins.length ? amStartMins.reduce((a,b)=>a+b,0)/amStartMins.length : null;
+  const avgEndAM   = amEndMins.length   ? amEndMins.reduce((a,b)=>a+b,0)/amEndMins.length     : null;
+  const avgStartPM = pmStartMins.length ? pmStartMins.reduce((a,b)=>a+b,0)/pmStartMins.length : null;
+  const avgEndPM   = pmEndMins.length   ? pmEndMins.reduce((a,b)=>a+b,0)/pmEndMins.length     : null;
+
+  // ── Period summary cards ──────────────────────────────────────────────────
+  const pc=document.getElementById('periodCards');
+  if(pc){
+    const amUtilColor = avgUtilAM!=='—' ? (parseInt(avgUtilAM)>=70?'var(--gn)':parseInt(avgUtilAM)>=50?'var(--am)':'var(--rd)') : 'var(--mt)';
+    const pmUtilColor = avgUtilPM!=='—' ? (parseInt(avgUtilPM)>=70?'var(--gn)':parseInt(avgUtilPM)>=50?'var(--am)':'var(--rd)') : 'var(--mt)';
+    const amTimeColor = avgTimeAM ? (parseFloat(avgTimeAM)<30?'var(--gn)':parseFloat(avgTimeAM)<50?'var(--am)':'var(--rd)') : 'var(--mt)';
+    const pmTimeColor = avgTimePM ? (parseFloat(avgTimePM)<30?'var(--gn)':parseFloat(avgTimePM)<50?'var(--am)':'var(--rd)') : 'var(--mt)';
+    const amTotalW=allRows.filter(r=>r.valid&&r.shift==='AM').reduce((a,r)=>a+r.weight/1000,0);
+    const pmTotalW=allRows.filter(r=>r.valid&&r.shift==='PM').reduce((a,r)=>a+r.weight/1000,0);
+    const amDaysN=new Set(allRows.filter(r=>r.valid&&r.shift==='AM').map(r=>r.date)).size||1;
+    const pmDaysN=new Set(allRows.filter(r=>r.valid&&r.shift==='PM').map(r=>r.date)).size||1;
+    const amDailyAvgW=(amTotalW/amDaysN).toFixed(1);
+    const pmDailyAvgW=(pmTotalW/pmDaysN).toFixed(1);
+
+    pc.innerHTML=`
+      <div style="font-size:10px;font-weight:600;color:var(--mt);font-family:var(--mo);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">
+        ★ 周期均值汇总
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px">
+
+        <div class="sc" style="border-left:3px solid var(--bl)">
+          <div class="sl">早班 均首车 / 末车</div>
+          <div class="sv" style="font-size:16px;color:#60a5fa">${minsToTimeStr(avgStartAM)}</div>
+          <div class="ss">末车 <strong style="color:#93c5fd">${minsToTimeStr(avgEndAM)}</strong></div>
+        </div>
+
+        <div class="sc" style="border-left:3px solid var(--bl)">
+          <div class="sl">早班 均效率</div>
+          <div class="sv" style="font-size:16px;color:#60a5fa">${avgWorkAM!=null?minsToHHMM(avgWorkAM):'—'}</div>
+          <div class="ss">利用率 <strong style="color:${amUtilColor}">${avgUtilAM}</strong> · 均装车 <strong style="color:${amTimeColor}">${avgTimeAM!=null?avgTimeAM+'分':'—'}</strong> · 日均 <strong style="color:#60a5fa">${amDailyAvgW}t</strong></div>
+        </div>
+
+        <div class="sc" style="border-left:3px solid var(--am)">
+          <div class="sl">下午班 均首车 / 末车</div>
+          <div class="sv" style="font-size:16px;color:#fcd34d">${minsToTimeStr(avgStartPM)}</div>
+          <div class="ss">末车 <strong style="color:#fde68a">${minsToTimeStr(avgEndPM)}</strong></div>
+        </div>
+
+        <div class="sc" style="border-left:3px solid var(--am)">
+          <div class="sl">下午班 均效率</div>
+          <div class="sv" style="font-size:16px;color:#fcd34d">${avgWorkPM!=null?minsToHHMM(avgWorkPM):'—'}</div>
+          <div class="ss">利用率 <strong style="color:${pmUtilColor}">${avgUtilPM}</strong> · 均装车 <strong style="color:${pmTimeColor}">${avgTimePM!=null?avgTimePM+'分':'—'}</strong> · 日均 <strong style="color:#fcd34d">${pmDailyAvgW}t</strong></div>
+        </div>
+
+      </div>`;
+  }
+
+  rows+=`<tr style="background:var(--sf2);border-top:2px solid var(--bd)">
+    <td class="tl" rowspan="2" style="font-size:11px;font-weight:700;font-family:var(--mo);color:var(--gn);vertical-align:middle">周期均值</td>
+    <td><span class="bdg bam">AM</span></td>
+    <td style="font-family:var(--mo);font-size:10px;font-weight:600;color:var(--gn)">${minsToTimeStr(avgStartAM)}</td>
+    <td style="font-family:var(--mo);font-size:10px;font-weight:600;color:var(--gn)">${minsToTimeStr(avgEndAM)}</td>
+    <td style="font-weight:700;font-family:var(--mo);color:var(--gn)">${avgWorkAM!=null?minsToHHMM(avgWorkAM):'—'}</td>
+    <td style="font-weight:700;font-family:var(--mo);color:var(--gn)">${avgTimeAM!=null?avgTimeAM+'分':'—'}</td>
+    <td style="font-family:var(--mo);color:var(--mt)">${amStartMins.length}天</td>
+    <td style="font-weight:700;font-family:var(--mo);color:var(--gn)">${avgUtilAM}</td>
+  </tr><tr style="background:var(--sf2)">
+    <td><span class="bdg bpm">PM</span></td>
+    <td style="font-family:var(--mo);font-size:10px;font-weight:600;color:var(--am)">${minsToTimeStr(avgStartPM)}</td>
+    <td style="font-family:var(--mo);font-size:10px;font-weight:600;color:var(--am)">${minsToTimeStr(avgEndPM)}</td>
+    <td style="font-weight:700;font-family:var(--mo);color:var(--am)">${avgWorkPM!=null?minsToHHMM(avgWorkPM):'—'}</td>
+    <td style="font-weight:700;font-family:var(--mo);color:var(--am)">${avgTimePM!=null?avgTimePM+'分':'—'}</td>
+    <td style="font-family:var(--mo);color:var(--mt)">${pmStartMins.length}天</td>
+    <td style="font-weight:700;font-family:var(--mo);color:var(--am)">${avgUtilPM}</td>
+  </tr>`;
+
+  el.innerHTML=`
+    <div class="card" style="margin-bottom:0">
+      <div class="ct">每日装车效率明细
+        <span style="font-size:9px;color:var(--mt);font-family:var(--mo);font-weight:400">
+          有效工作时间 = 首车开始 → 末车结束 · 利用率 ÷ 8h · 底部为周期均值
+        </span>
+      </div>
+      <div class="tw">
+        <table>
+          <thead><tr>
+            <th class="tl">日期</th><th>班次</th>
+            <th>首车开始</th><th>末车结束</th>
+            <th>有效工作时间</th>
+            <th style="color:var(--gn)">均装车时间</th>
+            <th>台次</th><th>利用率(÷8h)</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderUpChart(){
+  const by={};allRows.filter(r=>r.valid).forEach(r=>{if(!r.date)return;if(!by[r.date])by[r.date]={am:0,pm:0};if(r.shift==='AM')by[r.date].am+=r.weight/1000;else if(r.shift==='PM')by[r.date].pm+=r.weight/1000;});
+  const dates=Object.keys(by).sort();
+  if(uChart)uChart.destroy();
+  Chart.defaults.color='#6b7280';
+  uChart=new Chart(document.getElementById('upCh'),{type:'bar',data:{labels:dates.map(d=>d.slice(5)),datasets:[{label:'早班',data:dates.map(d=>+by[d].am.toFixed(1)),backgroundColor:'#1e3a5f',borderColor:'#3b82f6',borderWidth:1,stack:'s'},{label:'下午班',data:dates.map(d=>+by[d].pm.toFixed(1)),backgroundColor:'#451a03',borderColor:'#f59e0b',borderWidth:1,stack:'s'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{stacked:true,grid:{color:'rgba(255,255,255,.04)'}},x:{stacked:true,grid:{display:false}}}}});
+}
+
+// ── Render: Ranking ───────────────────────────────────────────────────────
+function renderRanking(){
+  const tb=document.getElementById('rankBody');
+  if(!results.length){tb.innerHTML='<tr><td colspan="11" style="padding:2rem;color:var(--mt)">请先上传数据</td></tr>';return;}
+  const vc=allRows.filter(r=>r.valid).length,ic=allRows.length-vc,cap=allRows.filter(r=>r._capped).length;
+  const vi=document.getElementById('validInfo');
+  if(vi)vi.textContent=`有效${vc} · 无效${ic} · ${cap}台触发上限`;
+  tb.innerHTML=results.map(r=>`<tr>
+    <td class="mn2" style="color:var(--mt)">${r.rank}</td>
+    <td class="tl"><strong>${r.name}</strong> ${r.at>r.pt?'<span class="bdg bam">AM</span>':'<span class="bdg bpm">PM</span>'}</td>
+    <td>${r.at>r.pt?'早班':'下午班'}</td>
+    <td class="mn2">${r.trucks}</td><td class="mn2">${r.weight}</td><td class="mn2">${r.avg_time}</td>
+    <td class="mn2">${r.avg_basic.toFixed(3)}</td><td class="mn2">${r.total_diff.toFixed(2)}</td>
+    <td class="gv">$${r.eb.toFixed(2)}</td><td class="av">$${r.db.toFixed(2)}</td>
+    <td class="bv" style="font-size:13px">$${r.total.toFixed(2)}</td>
+  </tr>`).join('');
+}
+
+// ── Render: Person cards ──────────────────────────────────────────────────
+function renderPersonCards(){
+  const grid=document.getElementById('personCards');
+  if(!results.length){grid.innerHTML='<div style="grid-column:1/-1;padding:2rem;text-align:center;color:var(--mt)">请先上传数据</div>';return;}
+  const maxB=results[0]?.total||1;
+  grid.innerHTML=results.map((r,i)=>{
+    const[bg,fg]=AVTS[i%AVTS.length];
+    const ini=r.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const ep=r.total>0?r.eb/r.total*100:80;const dp=100-ep;
+    const sel=selP===r.name?' sel':'';
+    return`<div class="pc${sel}" onclick="selectP('${r.name}',this)">
+      <div class="pc-top">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="pc-av" style="background:${bg};color:${fg}">${ini}</div>
+          <div><div class="pc-nm">${r.rank}. ${r.name}</div><div class="pc-sh">${r.at>r.pt?'早班 AM':'下午班 PM'}</div></div>
+        </div>
+        <div class="pc-bn">$${r.total.toFixed(2)}</div>
+      </div>
+      <div class="pc-br"><div style="width:${ep.toFixed(1)}%;background:var(--gn)"></div><div style="width:${dp.toFixed(1)}%;background:var(--am)"></div></div>
+      <div style="display:flex;gap:7px;font-size:9px;margin-bottom:7px;font-family:var(--mo)"><span style="color:var(--gn)">效率 $${r.eb.toFixed(1)}</span><span style="color:var(--am)">难度 $${r.db.toFixed(1)}</span></div>
+      <div class="pc-mt">
+        <div class="pc-mi">有效车 <span>${r.trucks}</span></div>
+        <div class="pc-mi">重量 <span>${r.weight}t</span></div>
+        <div class="pc-mi">均时 <span>${r.avg_time}分</span></div>
+        <div class="pc-mi">均基础分 <span>${r.avg_basic.toFixed(2)}</span></div>
+        ${r.avg_tph!=null?`<div class="pc-mi">装载效率 <span style="color:${r.avg_tph>=13?'var(--gn)':r.avg_tph>=8?'var(--am)':'var(--rd)'}">${r.avg_tph.toFixed(1)} t/h</span></div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+  if(selP)showDetail(selP);
+}
+
+function selectP(name,el){selP=name;document.querySelectorAll('.pc').forEach(c=>c.classList.remove('sel'));el.classList.add('sel');showDetail(name);}
+function showDetail(name){
+  const r=results.find(x=>x.name===name);if(!r)return;
+  document.getElementById('detailPanel').style.display='block';
+  document.getElementById('dpName').textContent=r.name;
+  document.getElementById('dpBonus').textContent='$'+r.total.toFixed(2);
+  const tphColor=r.avg_tph!=null?(r.avg_tph>=13?'var(--gn)':r.avg_tph>=8?'var(--am)':'var(--rd)'):'var(--mt)';
+  const tphLabel=r.avg_tph!=null?(r.avg_tph>=13?'优秀':r.avg_tph>=10?'良好':r.avg_tph>=8?'正常':'偏慢'):'—';
+  document.getElementById('dpGrid').innerHTML=`
+    <div class="dg-s"><div class="dg-v">${r.trucks}</div><div class="dg-l">有效装车次数</div></div>
+    <div class="dg-s"><div class="dg-v">${r.weight}t</div><div class="dg-l">总重量</div></div>
+    <div class="dg-s"><div class="dg-v">${r.avg_time}分</div><div class="dg-l">平均装车时间</div></div>
+    <div class="dg-s"><div class="dg-v" style="color:${tphColor}">${r.avg_tph!=null?r.avg_tph+' t/h':'—'}</div><div class="dg-l">均班次装载效率 <span style="color:${tphColor}">(${tphLabel})</span></div></div>
+    <div class="dg-s"><div class="dg-v">${r.avg_basic.toFixed(3)}</div><div class="dg-l">均基础效率分</div></div>
+    <div class="dg-s" style="background:var(--gb);border:1px solid var(--gd)"><div class="dg-v" style="color:var(--gn)">$${r.total.toFixed(2)}</div><div class="dg-l">最终奖金</div></div>`;
+  document.getElementById('dpEB').textContent='$'+r.eb.toFixed(2);
+  document.getElementById('dpDB').textContent='$'+r.db.toFixed(2);
+  document.getElementById('dpAB').textContent=r.avg_basic.toFixed(3);
+  document.getElementById('dpAT').textContent=r.avg_time;
+  document.getElementById('dpDS').textContent=r.total_diff.toFixed(2);
+  document.getElementById('dpAD').textContent=r.avg_diff.toFixed(2);
+  document.getElementById('dpAm').textContent=r.at+'次';document.getElementById('dpPm').textContent=r.pt+'次';
+  document.getElementById('dpAmW').textContent=r.aw+'t';document.getElementById('dpPmW').textContent=r.pw+'t';
+}
+
+// ── Render: Trucks (NEW) ──────────────────────────────────────────────────
+function renderTrucks(){
+  const df=document.getElementById('trDate').value;
+  const sf=document.getElementById('trShift').value;
+  const lf=document.getElementById('trLoader').value;
+  const vf=document.getElementById('trValid').value;
+  const tf=(document.getElementById('trSearch').value||'').toLowerCase();
+
+  const rows=allRows.filter(r=>{
+    if(df&&r.date!==df)return false;
+    if(sf&&r.shift!==sf)return false;
+    if(lf&&!r.loaders.includes(lf))return false;
+    if(vf==='1'&&!r.valid)return false;
+    if(vf==='0'&&r.valid)return false;
+    if(tf&&!(r.truck||'').toLowerCase().includes(tf))return false;
+    return true;
+  });
+
+  const tc=document.getElementById('truckCount');
+  if(tc)tc.textContent=`${rows.length} 条 / ${allRows.length} 条总计`;
+
+  const tb=document.getElementById('truckBody');
+  if(!rows.length){tb.innerHTML='<tr><td colspan="17" style="padding:2rem;color:var(--mt)">暂无数据</td></tr>';return;}
+
+  const MAX=getMaxPool();
+  const tphMap=calcAll._tphMap||{};
+  const effTierMap=calcAll._effTierMap||{};
+  tb.innerHTML=rows.map(r=>{
+    const sh=r.shift==='AM'?'<span class="bdg bam">AM</span>':r.shift==='PM'?'<span class="bdg bpm">PM</span>':'<span class="bdg" style="background:var(--sf2)">-</span>';
+    const vld=r.valid?'<span class="bdg bok">有效</span>':'<span class="bdg bno">无效</span>';
+    const capTag=r._capped?'<span class="bdg bcap">触发上限</span>':'';
+    const ppDisp=r.valid&&r._eligible?`<strong style="${r._capped?'color:#fb923c':''}">$${r._pp.toFixed(3)}</strong>${capTag}`:r.valid?'<span style="color:var(--mt);font-size:10px">无奖</span>':'-';
+    const rowClass=r._capped?' class="cap-row"':(!r._eligible&&r.valid?' class="inel-row"':'');
+    // Efficiency for this shift
+    const shiftKey=r.date+'|'+r.shift;
+    const tph=tphMap[shiftKey];
+    const effC=effTierMap[shiftKey];
+    const tphDisp=tph!=null?tph.toFixed(1):'—';
+    const tphColor=tph!=null?(tph>=13?'var(--gn)':tph>=8?'var(--am)':'var(--rd)'):'var(--mt)';
+    const effCDisp=effC!=null?'×'+effC.toFixed(2):'—';
+    const effCColor=effC!=null?(effC>=1.1?'var(--gn)':effC>=1.0?'var(--tx)':effC>=0.85?'var(--am)':'var(--rd)'):'var(--mt)';
+    return`<tr${rowClass}>
+      <td class="mn2" style="font-size:10px">${r.date}</td>
+      <td>${sh}</td>
+      <td class="tl" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px">${r.truck}</td>
+      <td class="mn2">${r.weight.toLocaleString()}</td>
+      <td class="mn2">${r.minutes!==null?r.minutes:'—'}</td>
+      <td class="mn2">${r.numL}</td>
+      <td class="tl" style="font-size:10px;max-width:170px">${r.loaders.join(' / ')}</td>
+      <td class="mn2">${r.bs.toFixed(2)}</td>
+      <td class="mn2">${r.ds.toFixed(2)}</td>
+      <td class="mn2" style="color:${r._combined>=1?'#4ade80':r._combined>=0.8?'var(--am)':'var(--rd)'};font-weight:${r._combined>=1?'600':'400'}">${r._combined.toFixed(3)}${!r._eligible&&r.valid?'<span style="font-size:9px;color:var(--rd);margin-left:2px">&lt;1</span>':''}</td>
+      <td class="mn2">${r._tier.toFixed(2)}</td>
+      <td class="mn2" style="color:${tphColor};font-weight:500">${tphDisp}</td>
+      <td class="mn2" style="color:${effCColor};font-weight:600">${effCDisp}</td>
+      <td class="mn2">${r._lc.toFixed(2)}</td>
+      <td class="mn2" style="${r._capped?'color:#fb923c;font-weight:600':r.valid&&r._eligible?'color:var(--am)':'color:var(--mt)'}">${r.valid&&r._eligible?'$'+r._pool.toFixed(3):'-'}</td>
+      <td class="mn2">${ppDisp}</td>
+      <td>${vld}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Serial → "HH:MM" ──────────────────────────────────────────────────────
+function serialToTime(v){
+  if(!v&&v!==0)return null;
+  var mins;
+  if(typeof v==='number') mins=Math.round(((v%1)+1)%1*1440);
+  else if(v&&v.getTime) mins=v.getHours()*60+v.getMinutes();
+  else return null;
+  return String(Math.floor(mins/60)).padStart(2,'0')+':'+String(mins%60).padStart(2,'0');
+}
+
+// Compute shift stats: effective work duration, avg loading time
+// Key insight: use LoadingStart date (startDate) for grouping, not Date_
+function getShiftStats(date, shift){
+  const rows = allRows.filter(r=>r.valid && r.shift===shift && (r.startDate===date||r.date===date));
+  if(!rows.length) return null;
+
+  const times = rows.map(r=>r.minutes).filter(m=>m!==null&&m>0&&m<=300);
+  const avgTime = times.length ? Math.round(times.reduce((a,b)=>a+b,0)/times.length*10)/10 : null;
+
+  // Group by startDate so serials are all from the same calendar day
+  // PM: Date_=next day but startDate=actual day → all serials on same integer day
+  const byDay={};
+  rows.forEach(r=>{
+    if(!r.startR||typeof r.startR!=='number'||r.startR<=0) return;
+    const key=Math.floor(r.startR); // integer = calendar day
+    if(!byDay[key]) byDay[key]={starts:[],ends:[]};
+    byDay[key].starts.push(r.startR);
+    if(r.finishR&&typeof r.finishR==='number'&&r.finishR>r.startR)
+      byDay[key].ends.push(r.finishR);
+  });
+
+  // Use the group with the most records (main working day)
+  let workStart=null, workEnd=null, workMins=null;
+  let bestKey=null, bestCount=0;
+  Object.keys(byDay).forEach(k=>{
+    if(byDay[k].starts.length>bestCount){bestCount=byDay[k].starts.length;bestKey=k;}
+  });
+  if(bestKey!==null){
+    const g=byDay[bestKey];
+    if(g.ends.length){
+      const minS=Math.min(...g.starts), maxE=Math.max(...g.ends);
+      const dur=(maxE-minS)*1440;
+      if(dur>0&&dur<840){
+        workStart=serialToTime(minS);
+        workEnd=serialToTime(maxE);
+        workMins=Math.round(dur);
+      }
+    }
+  }
+  return {n:rows.length, avgTime, workStart, workEnd, workMins};
+}
+
+// ── Render: Shift ─────────────────────────────────────────────────────────
+function renderShift(){
+  const dst={};allRows.filter(r=>r.valid).forEach(r=>{const k=r.date+'|'+r.shift;dst[k]=(dst[k]||0)+r.weight/1000;});
+  const mode=document.getElementById('sv').value,wf=document.getElementById('swk').value;
+  const cont=document.getElementById('shiftContent');
+  if(!allRows.length){cont.innerHTML='<div style="padding:2rem;text-align:center;color:var(--mt)">请先上传数据</div>';return;}
+  let html='';
+  if(mode==='daily'){
+    const dates=[...new Set(allRows.filter(r=>r.valid).map(r=>r.date).filter(Boolean))].sort();
+    dates.forEach(date=>{
+      const wk=wkKey(date);if(wf&&wk!==wf)return;
+      const aT=dst[date+'|AM']||0,pT=dst[date+'|PM']||0;
+      const aB=allRows.filter(r=>r.date===date&&r.shift==='AM'&&r.valid).reduce((a,r)=>a+r._pool,0);
+      const pB=allRows.filter(r=>r.date===date&&r.shift==='PM'&&r.valid).reduce((a,r)=>a+r._pool,0);
+      const as=getShiftStats(date,'AM'), ps=getShiftStats(date,'PM');
+
+      const shiftRow=(st,ton,bonus,color,bdgCls,shiftKey)=>{
+        if(!st) return `<div class="sw-r"><span style="color:var(--mt)">无数据</span></div>`;
+        const tierC=getTier(ton);
+        const tph=calcAll._tphMap&&calcAll._tphMap[shiftKey];
+        const effC=calcAll._effTierMap&&calcAll._effTierMap[shiftKey]!=null?calcAll._effTierMap[shiftKey]:1.0;
+        const finalTierC=tierC*effC;
+        const workLine = st.workStart&&st.workEnd
+          ? `${st.workStart} → ${st.workEnd} <span style="color:var(--mt)">(${st.workMins}分钟)</span>`
+          : '<span style="color:var(--mt)">—</span>';
+        const avgColor = st.avgTime ? (st.avgTime<30?'var(--gn)':st.avgTime<50?'var(--am)':'var(--rd)') : 'var(--mt)';
+        const tphColor = tph!=null?(tph>=13?'var(--gn)':tph>=8?'var(--am)':'var(--rd)'):'var(--mt)';
+        const effColor = effC>=1.1?'var(--gn)':effC>=1.0?color:effC>=0.85?'var(--am)':'var(--rd)';
+        return `
+          <div class="sw-r"><span>有效发货量</span><span>${ton.toFixed(1)} 吨</span></div>
+          <div class="sw-r"><span>有效装车次数</span><span>${st.n} 次</span></div>
+          <div class="sw-r"><span>平均装车时间</span><span style="color:${avgColor};font-weight:600">${st.avgTime!==null?st.avgTime+'分':'—'}</span></div>
+          <div class="sw-r"><span>有效工作时间</span><span style="font-family:var(--mo);font-size:10px">${workLine}</span></div>
+          <div class="sw-r"><span>装载效率</span><span style="color:${tphColor};font-weight:600;font-family:var(--mo)">${tph!=null?tph.toFixed(1)+' t/h':'—'}</span></div>
+          <div class="sw-r"><span>发货量系数</span><span style="color:${tierC>0?color:'var(--rd)'}">${tierC>0?'×'+tierC.toFixed(2):'0 未达下限'}</span></div>
+          <div class="sw-r"><span>效率系数</span><span style="color:${effColor}">×${effC.toFixed(2)}</span></div>
+          <div class="sw-r" style="border-top:1px solid var(--bd);margin-top:2px;padding-top:4px"><span style="font-weight:600;color:var(--tx)">最终班次系数</span><span style="font-weight:700;color:${color}">×${finalTierC.toFixed(2)}</span></div>
+          <div class="sw-r"><span>奖金池合计</span><span style="color:${color}">$${bonus.toFixed(2)}</span></div>`;
+      };
+
+      html+=`<div style="margin-bottom:14px">
+        <div style="font-size:10px;font-weight:600;color:var(--mt);padding:4px 0;border-bottom:1px solid var(--bd);margin-bottom:8px;display:flex;justify-content:space-between;font-family:var(--mo)">
+          <span>${date}</span><span>有效合计 ${(aT+pT).toFixed(1)} t</span>
+        </div>
+        <div class="sw-g">
+          <div class="sw-c am"><div class="sw-t"><span class="bdg bam">AM</span>早班</div>${shiftRow(as,aT,aB,'var(--gn)','bam',date+'|AM')}</div>
+          <div class="sw-c pm"><div class="sw-t"><span class="bdg bpm">PM</span>下午班</div>${shiftRow(ps,pT,pB,'var(--am)','bpm',date+'|PM')}</div>
+        </div>
+      </div>`;
+    });
+  } else {
+    const weeks=[...new Set(allRows.map(r=>r.week).filter(Boolean))].sort();
+    weeks.forEach(wk=>{
+      if(wf&&wk!==wf)return;
+      const wr=allRows.filter(r=>r.week===wk&&r.valid);
+      const aT=wr.filter(r=>r.shift==='AM').reduce((a,r)=>a+r.weight/1000,0);
+      const pT=wr.filter(r=>r.shift==='PM').reduce((a,r)=>a+r.weight/1000,0);
+      const aB=wr.filter(r=>r.shift==='AM').reduce((a,r)=>a+r._pool,0);
+      const pB=wr.filter(r=>r.shift==='PM').reduce((a,r)=>a+r._pool,0);
+      const ds=[...new Set(wr.map(r=>r.date))].sort();
+      const aTimes=wr.filter(r=>r.shift==='AM'&&r.minutes>0&&r.minutes<=300).map(r=>r.minutes);
+      const pTimes=wr.filter(r=>r.shift==='PM'&&r.minutes>0&&r.minutes<=300).map(r=>r.minutes);
+      const aAvg=aTimes.length?(aTimes.reduce((a,b)=>a+b,0)/aTimes.length).toFixed(1):'—';
+      const pAvg=pTimes.length?(pTimes.reduce((a,b)=>a+b,0)/pTimes.length).toFixed(1):'—';
+      html+=`<div style="margin-bottom:14px">
+        <div style="font-size:10px;font-weight:600;color:var(--mt);padding:4px 0;border-bottom:1px solid var(--bd);margin-bottom:8px;display:flex;justify-content:space-between;font-family:var(--mo)">
+          <span>周 ${wk} → ${ds[ds.length-1]}</span><span>${(aT+pT).toFixed(1)} t / ${ds.length} 天</span>
+        </div>
+        <div class="sw-g">
+          <div class="sw-c am"><div class="sw-t"><span class="bdg bam">AM</span>早班周合计</div>
+            <div class="sw-r"><span>发货量</span><span>${aT.toFixed(1)} 吨</span></div>
+            <div class="sw-r"><span>日均</span><span>${(aT/Math.max(1,ds.length)).toFixed(1)} 吨</span></div>
+            <div class="sw-r"><span>均装车时间</span><span style="color:var(--gn)">${aAvg} 分</span></div>
+            <div class="sw-r"><span>奖金池合计</span><span style="color:var(--gn)">$${aB.toFixed(2)}</span></div>
+          </div>
+          <div class="sw-c pm"><div class="sw-t"><span class="bdg bpm">PM</span>下午班周合计</div>
+            <div class="sw-r"><span>发货量</span><span>${pT.toFixed(1)} 吨</span></div>
+            <div class="sw-r"><span>日均</span><span>${(pT/Math.max(1,ds.length)).toFixed(1)} 吨</span></div>
+            <div class="sw-r"><span>均装车时间</span><span style="color:var(--am)">${pAvg} 分</span></div>
+            <div class="sw-r"><span>奖金池合计</span><span style="color:var(--am)">$${pB.toFixed(2)}</span></div>
+          </div>
+        </div>
+      </div>`;
+    });
+  }
+  cont.innerHTML=html||'<div style="padding:2rem;text-align:center;color:var(--mt)">暂无数据</div>';
+}
+
+// ── Render: PDF preview ───────────────────────────────────────────────────
+function renderPDF(){
+  if(!results.length){document.getElementById('pdfTable').innerHTML='<div style="padding:10px;color:var(--mt)">请先上传数据</div>';return;}
+  document.getElementById('pdfTable').innerHTML=`<div class="tw"><table><thead><tr><th>排名</th><th class="tl">姓名</th><th>班次</th><th>有效车次</th><th style="color:var(--gn)">效率奖金</th><th style="color:var(--am)">难度奖金</th><th style="color:#60a5fa">总奖金($)</th></tr></thead><tbody>${results.map(r=>`<tr><td class="mn2">${r.rank}</td><td class="tl">${r.name}</td><td>${r.at>r.pt?'<span class="bdg bam">早班</span>':'<span class="bdg bpm">下午班</span>'}</td><td class="mn2">${r.trucks}</td><td class="gv">$${r.eb.toFixed(2)}</td><td class="av">$${r.db.toFixed(2)}</td><td class="bv">$${r.total.toFixed(2)}</td></tr>`).join('')}</tbody></table></div>`;
+  const sel=document.getElementById('prevP');sel.innerHTML=results.map(r=>`<option value="${r.name}">${r.name}</option>`).join('');renderPreview();
+}
+function renderPreview(){
+  const name=document.getElementById('prevP').value;
+  const r=results.find(x=>x.name===name);if(!r)return;
+  document.getElementById('noticePrev').innerHTML=buildNoticeHTML(r);
+}
+
+// ── Export complete report ────────────────────────────────────────────────
+function exportReport(){
+  if(!allRows.length){alert('请先上传数据');return;}
+  const wb=XLSX.utils.book_new();
+  const MAX=getMaxPool();
+
+  // Sheet 1: 人员奖金汇总
+  const s1=results.map(r=>({
+    '排名':r.rank,'姓名':r.name,'主班次':r.at>r.pt?'早班AM':'下午班PM',
+    '有效装车次数':r.trucks,'总重量(t)':r.weight,'平均装车时间(分)':r.avg_time,
+    '平均基础效率分':r.avg_basic,'难度分合计':r.total_diff,
+    '效率奖金($)':r.eb,'难度奖金($)':r.db,'总奖金($)':r.total,
+    '早班次数':r.at,'下午班次数':r.pt,'早班重量(t)':r.aw,'下午班重量(t)':r.pw
+  }));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(s1),'人员奖金汇总');
+
+  // Sheet 2: 装车明细
+  const s2=allRows.map(r=>({
+    '日期':r.date,'班次':r.shift,'车辆':r.truck,'重量(kg)':r.weight,
+    '装车时间(分)':r.minutes!==null?r.minutes:'','装车人数':r.numL,
+    '装车人员':r.loaders.join(' / '),'基础效率分':r.bs.toFixed(3),
+    '难度加分':r.ds.toFixed(3),'综合系数':r._combined.toFixed(3),
+    '班次系数':r._tier.toFixed(2),'人数系数':r._lc.toFixed(2),
+    '原始奖金池($)':r.valid?r._rawPool.toFixed(4):'0',
+    ['奖金池($)(上限$'+MAX+')']:r.valid?r._pool.toFixed(4):'0',
+    '每人奖金($)':r.valid?r._pp.toFixed(4):'0',
+    '是否触发上限':r._capped?'是':'否',
+    '是否有效':r.valid?'有效':'无效'
+  }));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(s2),'装车明细');
+
+  // Sheet 3: 班次汇总（按日）
+  const dst={};allRows.filter(r=>r.valid).forEach(r=>{const k=r.date+'|'+r.shift;dst[k]=(dst[k]||0)+r.weight/1000;});
+  const dates=[...new Set(allRows.filter(r=>r.valid).map(r=>r.date).filter(Boolean))].sort();
+  const s3=[];
+  dates.forEach(date=>{
+    ['AM','PM'].forEach(shift=>{
+      const ton=dst[date+'|'+shift]||0;
+      const rows=allRows.filter(r=>r.date===date&&r.shift===shift&&r.valid);
+      const poolSum=rows.reduce((a,r)=>a+r._pool,0);
+      const capped=rows.filter(r=>r._capped).length;
+      const capKey='触发$'+MAX+'上限次数'; const row3={'日期':date,'班次':shift,'发货量(t)':ton.toFixed(2),'装车次数':rows.length,'班次系数':getTier(ton).toFixed(2),'奖金池合计($)':poolSum.toFixed(2)}; row3[capKey]=capped; s3.push(row3);
+    });
+  });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(s3),'班次汇总');
+
+  // Sheet 4: 参数记录
+  const wEff=parseFloat(document.getElementById('wEff').value)||0.8;
+  const wDiff=parseFloat(document.getElementById('wDiff').value)||1.0;
+  const s4=[
+    {'参数':'报告日期范围','值':dateFrom+' ~ '+dateTo},
+    {'参数':'每人单车奖金上限($)','值':MAX},
+    {'参数':'人数系数-1人','值':gv('c1')},
+    {'参数':'人数系数-2人','值':gv('c2')},
+    {'参数':'人数系数-3人','值':gv('c3')},
+    {'参数':'早班时间','值':gv_s('amS')+' ~ '+gv_s('amE')},
+    {'参数':'下午班时间','值':gv_s('pmS')+' ~ '+gv_s('pmE')},
+    {'参数':'效率分权重','值':wEff},
+    {'参数':'难度分权重','值':wDiff},
+    {'参数':'奖金公式','值':'综合系数=基础分×'+wEff+'+难度分×'+wDiff+'；奖金池=重量×综合系数×人数系数×班次系数；每人=奖金池÷人数'},
+    ...TIERS.sort((a,b)=>a.t-b.t).map(t=>({'参数':'激励阶梯≥'+t.t+'吨','值':t.c})),
+    {'参数':'导出时间','值':new Date().toLocaleString('zh-CN')}
+  ];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(s4),'参数记录');
+
+  // Sheet 5: 个人详情（每人每台车明细）
+  const s5=[];
+  results.forEach(r=>{
+    const myRows=allRows.filter(row=>row.valid&&row.loaders.includes(r.name));
+    myRows.sort((a,b)=>a.date.localeCompare(b.date));
+    // Person header row
+    s5.push({
+      '姓名':r.name,'日期':'','班次':'','车辆':'','重量(kg)':'',
+      '装车时间(分)':'','人数':'','基础分':'','难度分':'','综合系数':'',
+      '班次系数':'','人数系数':'','每人奖金($)':'',
+      '--- 汇总 ---':'','有效车次':r.trucks,'总重量(t)':r.weight,
+      '均时(分)':r.avg_time,'均基础分':r.avg_basic.toFixed(3),
+      '效率奖金($)':r.eb.toFixed(2),'难度奖金($)':r.db.toFixed(2),'总奖金($)':r.total.toFixed(2)
+    });
+    // Each truck row
+    myRows.forEach(row=>{
+      s5.push({
+        '姓名':'','日期':row.date,'班次':row.shift,'车辆':row.truck,'重量(kg)':row.weight,
+        '装车时间(分)':row.minutes!==null?row.minutes:'','人数':row.numL,
+        '基础分':row.bs.toFixed(3),'难度分':row.ds.toFixed(3),'综合系数':row._combined.toFixed(3),
+        '班次系数':row._tier.toFixed(2),'人数系数':row._lc.toFixed(2),
+        '每人奖金($)':row._pp.toFixed(4),
+        '--- 汇总 ---':'','有效车次':'','总重量(t)':'',
+        '均时(分)':'','均基础分':'','效率奖金($)':'','难度奖金($)':'','总奖金($)':''
+      });
+    });
+    // Blank separator
+    s5.push({'姓名':'','日期':'','班次':'','车辆':'','重量(kg)':'','装车时间(分)':'','人数':'','基础分':'','难度分':'','综合系数':'','班次系数':'','人数系数':'','每人奖金($)':'','--- 汇总 ---':'','有效车次':'','总重量(t)':'','均时(分)':'','均基础分':'','效率奖金($)':'','难度奖金($)':'','总奖金($)':''});
+  });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(s5),'个人详情');
+
+  // Sheet 6: 总览（每日AM/PM吨数+奖金池，对应首页图表）
+  const dst2={};
+  allRows.filter(r=>r.valid).forEach(r=>{
+    const k=r.date+'|'+r.shift;
+    if(!dst2[k])dst2[k]={tons:0,pool:0,trucks:0};
+    dst2[k].tons+=r.weight/1000;dst2[k].pool+=r._pool;dst2[k].trucks++;
+  });
+  const allDates=[...new Set(allRows.filter(r=>r.valid).map(r=>r.date).filter(Boolean))].sort();
+  const s6=[];
+  // Summary row first
+  const totAM=allRows.filter(r=>r.valid&&r.shift==='AM').reduce((a,r)=>a+r.weight/1000,0);
+  const totPM=allRows.filter(r=>r.valid&&r.shift==='PM').reduce((a,r)=>a+r.weight/1000,0);
+  const totOther=allRows.filter(r=>r.valid&&r.shift==='OTHER').reduce((a,r)=>a+r.weight/1000,0);
+  const totBonus=results.reduce((a,r)=>a+r.total,0);
+  s6.push({'日期':'汇总','早班AM(t)':totAM.toFixed(2),'下午班PM(t)':totPM.toFixed(2),'其他(t)':totOther.toFixed(2),'合计(t)':(totAM+totPM+totOther).toFixed(2),'早班奖金池($)':(allRows.filter(r=>r.valid&&r.shift==='AM').reduce((a,r)=>a+r._pool,0)).toFixed(2),'下午班奖金池($)':(allRows.filter(r=>r.valid&&r.shift==='PM').reduce((a,r)=>a+r._pool,0)).toFixed(2),'总奖金池($)':totBonus.toFixed(2),'早班车次':allRows.filter(r=>r.valid&&r.shift==='AM').length,'下午班车次':allRows.filter(r=>r.valid&&r.shift==='PM').length});
+  s6.push({'日期':'---','早班AM(t)':'','下午班PM(t)':'','其他(t)':'','合计(t)':'','早班奖金池($)':'','下午班奖金池($)':'','总奖金池($)':'','早班车次':'','下午班车次':''});
+  allDates.forEach(date=>{
+    const am=dst2[date+'|AM']||{tons:0,pool:0,trucks:0};
+    const pm=dst2[date+'|PM']||{tons:0,pool:0,trucks:0};
+    const ot=dst2[date+'|OTHER']||{tons:0,pool:0,trucks:0};
+    const as=getShiftStats(date,'AM'), ps=getShiftStats(date,'PM');
+    s6.push({
+      '日期':date,
+      '早班AM(t)':am.tons.toFixed(2),'下午班PM(t)':pm.tons.toFixed(2),'其他(t)':ot.tons.toFixed(2),
+      '合计(t)':(am.tons+pm.tons+ot.tons).toFixed(2),
+      '早班均时(分)':as&&as.avgTime!==null?as.avgTime:'',
+      '下午班均时(分)':ps&&ps.avgTime!==null?ps.avgTime:'',
+      '早班工作时间':as&&as.workStart?as.workStart+'→'+as.workEnd+'('+as.workMins+'分)':'',
+      '下午班工作时间':ps&&ps.workStart?ps.workStart+'→'+ps.workEnd+'('+ps.workMins+'分)':'',
+      '早班奖金池($)':am.pool.toFixed(2),'下午班奖金池($)':pm.pool.toFixed(2),
+      '总奖金池($)':(am.pool+pm.pool+ot.pool).toFixed(2),
+      '早班车次':am.trucks,'下午班车次':pm.trucks
+    });
+  });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(s6),'每日总览');
+
+  const fn='Loader_Bonus_Report_'+dateFrom+'_'+dateTo+'.xlsx';
+  XLSX.writeFile(wb,fn);
+}
+
+// ── Drag-drop ─────────────────────────────────────────────────────────────
+const dz=document.getElementById('dz');
+dz.addEventListener('dragover',e=>{e.preventDefault();e.stopPropagation();dz.classList.add('ov');});
+dz.addEventListener('dragleave',e=>{e.stopPropagation();dz.classList.remove('ov');});
+dz.addEventListener('drop',e=>{
+  e.preventDefault();e.stopPropagation();dz.classList.remove('ov');
+  const f=e.dataTransfer.files[0];if(f)loadFile(f);
+});
+// Reset input value so the same file can be re-selected
+document.getElementById('xlf').addEventListener('click',function(){this.value='';});
+
+
+// ── Notice HTML builder ───────────────────────────────────────────────────
+function buildNoticeHTML(r){
+  const HR='<hr style="border:none;border-top:1px dashed #ccc;margin:10px 0">';
+
+  // Get this person's trucks from allRows for detail stats
+  const myRows = allRows.filter(row=>row.valid && row.loaders.includes(r.name));
+  const amRows = myRows.filter(row=>row.shift==='AM');
+  const pmRows = myRows.filter(row=>row.shift==='PM');
+  const mainShift = r.at>=r.pt ? 'AM' : 'PM';
+  const shiftRows = mainShift==='AM' ? amRows : pmRows;
+
+  // Avg basic score, best/worst time
+  const validTimes = shiftRows.map(row=>row.minutes).filter(m=>m>0&&m<=300);
+  const minTime = validTimes.length ? Math.min(...validTimes) : null;
+  const maxTime = validTimes.length ? Math.max(...validTimes) : null;
+  const totalWeightT = (myRows.reduce((a,row)=>a+row.weight,0)/1000).toFixed(1);
+
+  // Shift efficiency: collect per-shift tph for this person's shifts
+  const myShiftKeys=[...new Set(myRows.map(row=>row.date+'|'+row.shift))];
+  const tphMap=calcAll._tphMap||{};
+  const effTierMap=calcAll._effTierMap||{};
+  // Build per-shift efficiency table (for notice)
+  const shiftEffRows=[];
+  myShiftKeys.sort().forEach(k=>{
+    const tph=tphMap[k];
+    const effC=effTierMap[k];
+    if(tph==null)return;
+    const [dt,sh]=k.split('|');
+    const shiftTrucks=myRows.filter(row=>row.date===dt&&row.shift===sh);
+    const ton=shiftTrucks.reduce((a,row)=>a+row.weight/1000,0);
+    // get shift span from stats
+    const st=getShiftStats(dt,sh);
+    shiftEffRows.push({date:dt,shift:sh,ton:ton.toFixed(1),tph:tph.toFixed(1),effC:effC?effC.toFixed(2):'—',workTime:st&&st.workStart?st.workStart+'→'+st.workEnd+' ('+st.workMins+'分)':'—'});
+  });
+  const avgTph=r.avg_tph!=null?r.avg_tph.toFixed(1):'—';
+  const tphLabel=r.avg_tph!=null?(r.avg_tph>=13?'优秀 🚀':r.avg_tph>=10?'良好 👍':r.avg_tph>=8?'正常 ✓':'偏慢 ⚡'):'—';
+  const tphColor=r.avg_tph!=null?(r.avg_tph>=13?'#166534':r.avg_tph>=8?'#92400e':'#991b1b'):'#888';
+
+  // Score distribution
+  const scoreCount = {s11:0, s10:0, s09:0, s08:0, s0:0};
+  shiftRows.forEach(row=>{
+    const s=Math.round(row.bs*10);
+    if(s>=11) scoreCount.s11++;
+    else if(s>=10) scoreCount.s10++;
+    else if(s>=9) scoreCount.s09++;
+    else if(s>=8) scoreCount.s08++;
+    else scoreCount.s0++;
+  });
+  const totalShift = shiftRows.length || 1;
+
+  // Score bar widths
+  const w11=(scoreCount.s11/totalShift*100).toFixed(0);
+  const w10=(scoreCount.s10/totalShift*100).toFixed(0);
+  const w09=(scoreCount.s09/totalShift*100).toFixed(0);
+  const w08=(scoreCount.s08/totalShift*100).toFixed(0);
+  const w0 =(scoreCount.s0/totalShift*100).toFixed(0);
+
+  // Rank info
+  const rankOf = results.filter(x=>x.trucks>0).length;
+
+  return `<div style="font-family:'Microsoft YaHei','PingFang SC',Arial,sans-serif;font-size:10px;color:#111;line-height:1.4;padding:16px 24px;max-width:740px;margin:0 auto">
+
+    <!-- ── HEADER ── -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:4px">
+      <div>
+        <div style="font-size:20px;font-weight:800;letter-spacing:-0.5px">${r.name}</div>
+        <div style="font-size:9px;color:#888;margin-top:1px">Date: ${dateFrom} – ${dateTo} &nbsp;·&nbsp; ${mainShift==='AM'?'AM 早班':'PM 下午班'} &nbsp;·&nbsp; Rank <strong style="color:#111">#${r.rank}</strong> / ${rankOf}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:9px;color:#888">Total Bonus</div>
+        <div style="font-size:28px;font-weight:900;color:#166534;line-height:1">$${r.total.toFixed(2)}</div>
+      </div>
+    </div>
+    <hr style="border:none;border-top:2px solid #111;margin:6px 0 8px">
+
+    <!-- ── PERFORMANCE STATS (绿色块，紧凑版) ── -->
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:8px 10px;margin-bottom:8px">
+      <div style="font-size:9px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">
+        📊 周期装车效率详情 / Loading Performance
+      </div>
+
+      <!-- 6 stats in 2 rows of 3 -->
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin-bottom:6px;font-size:9px">
+        <div style="background:#fff;border-radius:4px;padding:4px 5px;border:1px solid #d1fae5;text-align:center">
+          <div style="color:#888;font-size:8px">有效装车</div>
+          <div style="font-size:13px;font-weight:700;color:#166534">${r.trucks}</div>
+        </div>
+        <div style="background:#fff;border-radius:4px;padding:4px 5px;border:1px solid #d1fae5;text-align:center">
+          <div style="color:#888;font-size:8px">总重量</div>
+          <div style="font-size:13px;font-weight:700;color:#166534">${totalWeightT}t</div>
+        </div>
+        <div style="background:#fff;border-radius:4px;padding:4px 5px;border:1px solid #d1fae5;text-align:center">
+          <div style="color:#888;font-size:8px">均装车时间</div>
+          <div style="font-size:13px;font-weight:700;color:#166534">${r.avg_time}分</div>
+        </div>
+        <div style="background:#fff;border-radius:4px;padding:4px 5px;border:1px solid #d1fae5;text-align:center">
+          <div style="color:#888;font-size:8px">最快</div>
+          <div style="font-size:13px;font-weight:700;color:#166534">${minTime!==null?minTime+'分':'—'}</div>
+        </div>
+        <div style="background:#fff;border-radius:4px;padding:4px 5px;border:1px solid #d1fae5;text-align:center">
+          <div style="color:#888;font-size:8px">最慢</div>
+          <div style="font-size:13px;font-weight:700;color:#92400e">${maxTime!==null?maxTime+'分':'—'}</div>
+        </div>
+        <div style="background:#fff;border-radius:4px;padding:4px 5px;border:1px solid #d1fae5;text-align:center">
+          <div style="color:#888;font-size:8px">均基础分</div>
+          <div style="font-size:13px;font-weight:700;color:#166534">${r.avg_basic.toFixed(2)}</div>
+        </div>
+      </div>
+
+      <!-- Score distribution bar -->
+      <div style="margin-bottom:4px">
+        <div style="font-size:8px;color:#555;margin-bottom:3px;font-weight:600">效率分分布（主班次 ${totalShift} 台）</div>
+        <div style="display:flex;height:16px;border-radius:3px;overflow:hidden;width:100%;border:1px solid #e5e7eb">
+          ${w11>0?`<div style="width:${w11}%;background:#14532d;display:flex;align-items:center;justify-content:center;font-size:7px;color:#fff;font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact">1.1</div>`:''}
+          ${w10>0?`<div style="width:${w10}%;background:#16a34a;display:flex;align-items:center;justify-content:center;font-size:7px;color:#fff;font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact">1.0</div>`:''}
+          ${w09>0?`<div style="width:${w09}%;background:#86efac;display:flex;align-items:center;justify-content:center;font-size:7px;color:#14532d;font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact">0.9</div>`:''}
+          ${w08>0?`<div style="width:${w08}%;background:#dcfce7;display:flex;align-items:center;justify-content:center;font-size:7px;color:#14532d;font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact">0.8</div>`:''}
+          ${w0>0?`<div style="width:${w0}%;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:7px;color:#9ca3af;-webkit-print-color-adjust:exact;print-color-adjust:exact">0</div>`:''}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:3px;font-size:7.5px;flex-wrap:wrap;color:#444">
+          ${scoreCount.s11>0?`<span><span style="color:#14532d;font-weight:700">■</span> 1.1: ${scoreCount.s11}台(${w11}%)</span>`:''}
+          ${scoreCount.s10>0?`<span><span style="color:#16a34a;font-weight:700">■</span> 1.0: ${scoreCount.s10}台(${w10}%)</span>`:''}
+          ${scoreCount.s09>0?`<span><span style="color:#86efac;font-weight:700">■</span> 0.9: ${scoreCount.s09}台(${w09}%)</span>`:''}
+          ${scoreCount.s08>0?`<span style="color:#aaa"><span style="color:#bbf7d0;font-weight:700">■</span> 0.8: ${scoreCount.s08}台(${w08}%)</span>`:''}
+          ${scoreCount.s0>0?`<span style="color:#aaa"><span style="color:#d1d5db;font-weight:700">■</span> 无: ${scoreCount.s0}台(${w0}%)</span>`:''}
+        </div>
+      </div>
+
+      <!-- Bonus split -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:9px">
+        <div style="background:#fff;border-radius:4px;padding:4px 8px;border:1px solid #d1fae5;display:flex;justify-content:space-between;align-items:center">
+          <span style="color:#888">效率奖金</span><span style="font-size:13px;font-weight:700;color:#166534">$${r.eb.toFixed(2)}</span>
+        </div>
+        <div style="background:#fff;border-radius:4px;padding:4px 8px;border:1px solid #d1fae5;display:flex;justify-content:space-between;align-items:center">
+          <span style="color:#888">难度奖金</span><span style="font-size:13px;font-weight:700;color:#b45309">$${r.db.toFixed(2)}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SHIFT EFFICIENCY (黄色块，紧凑版) ── -->
+    <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:8px 10px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="font-size:9px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.06em">⚡ 班次装载效率 / Shift Loading Efficiency</div>
+        <div style="font-size:8px;color:#888">效率 = 有效发货量 ÷ 有效工作时间</div>
+      </div>
+      <!-- 2 summary stats -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:6px;font-size:9px">
+        <div style="text-align:center;background:#fff;border-radius:4px;padding:4px;border:1px solid #fde68a">
+          <div style="font-size:16px;font-weight:800;color:#111">${avgTph}<span style="font-size:9px"> t/h</span></div>
+          <div style="font-size:8px;color:#666">平均装载效率</div>
+        </div>
+        <div style="text-align:center;background:#fff;border-radius:4px;padding:4px;border:1px solid #fde68a">
+          <div style="font-size:16px;font-weight:800;color:#111">${shiftEffRows.length}</div>
+          <div style="font-size:8px;color:#666">参与班次数</div>
+        </div>
+      </div>
+      ${shiftEffRows.length>0?`
+      <table style="width:100%;border-collapse:collapse;font-size:8.5px;color:#111">
+        <thead>
+          <tr style="background:#fef3c7">
+            <th style="padding:3px 5px;text-align:left;border:1px solid #fde68a;font-weight:600;color:#fff;background:#92400e">日期</th>
+            <th style="padding:3px 5px;text-align:center;border:1px solid #fde68a;font-weight:600;color:#fff;background:#92400e">班次</th>
+            <th style="padding:3px 5px;text-align:center;border:1px solid #fde68a;font-weight:600;color:#fff;background:#92400e">发货量</th>
+            <th style="padding:3px 5px;text-align:left;border:1px solid #fde68a;font-weight:600;color:#fff;background:#92400e">有效工作时间</th>
+            <th style="padding:3px 5px;text-align:center;border:1px solid #fde68a;font-weight:600;color:#fff;background:#92400e">效率(t/h)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${shiftEffRows.map((row,i)=>`<tr style="background:${i%2===0?'#fff':'#fffbeb'}">
+            <td style="padding:2px 5px;border:1px solid #fde68a;color:#111">${row.date}</td>
+            <td style="padding:2px 5px;border:1px solid #fde68a;text-align:center;color:#111">${row.shift==='AM'?'早班':'下午班'}</td>
+            <td style="padding:2px 5px;border:1px solid #fde68a;text-align:center;font-weight:600;color:#111">${row.ton}t</td>
+            <td style="padding:2px 5px;border:1px solid #fde68a;font-size:7.5px;color:#111">${row.workTime}</td>
+            <td style="padding:2px 5px;border:1px solid #fde68a;text-align:center;font-weight:700;color:#111">${row.tph}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`:'<div style="color:#aaa;font-size:8px;text-align:center;padding:4px">无效率数据</div>'}
+    </div>
+    <hr style="border:none;border-top:1px dashed #ccc;margin:6px 0">
+
+    <!-- ── FACTORS (3列紧凑) ── -->
+    <div style="font-weight:700;margin-bottom:3px;font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#333">Factors Affecting Bonus / 影响奖金的因素</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:6px">
+      <div style="background:#f9fafb;border-radius:4px;padding:4px 6px;border:1px solid #e5e7eb;font-size:8px">
+        <div style="font-weight:700;margin-bottom:1px">Individual Performance</div>
+        <div style="color:#555;line-height:1.3">By supervisor.<br>由主管或经理评估。</div>
+      </div>
+      <div style="background:#f9fafb;border-radius:4px;padding:4px 6px;border:1px solid #e5e7eb;font-size:8px">
+        <div style="font-weight:700;margin-bottom:1px">Company Performance</div>
+        <div style="color:#555;line-height:1.3">Financial goals.<br>公司整体财务目标。</div>
+      </div>
+      <div style="background:#f9fafb;border-radius:4px;padding:4px 6px;border:1px solid #e5e7eb;font-size:8px">
+        <div style="font-weight:700;margin-bottom:1px">Team Performance</div>
+        <div style="color:#555;line-height:1.3">Team contribution.<br>对团队目标贡献。</div>
+      </div>
+    </div>
+    <hr style="border:none;border-top:1px dashed #ccc;margin:6px 0">
+
+    <!-- ── INVALID SITUATIONS (2列紧凑) ── -->
+    <div style="font-weight:700;margin-bottom:3px;font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#333">Invalid Situations / 奖金无效的情况</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 16px;font-size:8px;margin-bottom:5px;color:#333">
+      <div style="padding:2px 0;border-bottom:1px solid #f3f4f6">Attendance &lt; 80% &nbsp;<span style="color:#666">出勤率低于80%</span></div>
+      <div style="padding:2px 0;border-bottom:1px solid #f3f4f6">No advance leave &nbsp;<span style="color:#666">未提前请假</span></div>
+      <div style="padding:2px 0;border-bottom:1px solid #f3f4f6">Trucks &lt; 4/shift &nbsp;<span style="color:#666">每班装车低于4台</span></div>
+      <div style="padding:2px 0;border-bottom:1px solid #f3f4f6">40% performance fail &nbsp;<span style="color:#666">40%表现未达标</span></div>
+      <div style="padding:2px 0">New employee training &nbsp;<span style="color:#666">新人培训期</span></div>
+    </div>
+    <!-- Violations -->
+    <div style="background:#fef9f0;border:1px solid #fde68a;border-radius:4px;padding:5px 8px;margin-bottom:6px;font-size:8px">
+      <div style="font-weight:700;color:#92400e;margin-bottom:3px">违规扣款 / Penalty Deductions</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;color:#444;line-height:1.4">
+        <div>1. 违反安全规范和操作SOP（未佩戴安全装备等）<br><span style="color:#92400e;font-weight:600">扣 20%</span></div>
+        <div>2. 装车不符合质量标准或出现客户投诉<br><span style="color:#92400e;font-weight:600">扣 30%</span></div>
+        <div style="margin-top:2px">3. 消极怠工导致装车时间超过合理范围<br><span style="color:#92400e;font-weight:600">扣 30%</span></div>
+        <div style="margin-top:2px">4. 车间凌乱（木头/布带随意丢放等）<br><span style="color:#92400e;font-weight:600">扣 15%</span></div>
+      </div>
+    </div>
+
+    <!-- ── WORKING PERFORMANCE ── -->
+    <div style="font-weight:700;margin-bottom:3px;font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#333">Working Performance / 此次奖金周期工作表现</div>
+    <div style="border-bottom:1px solid #ccc;height:16px;margin-bottom:6px"></div>
+    <div style="border-bottom:1px solid #ccc;height:16px;margin-bottom:6px"></div>
+    <div style="border-bottom:1px solid #ccc;height:16px;margin-bottom:8px"></div>
+    <div style="font-size:9px;margin-bottom:4px;color:#555">奖金扣除 Deduction：_____________ $/H</div>
+    ${HR}
+
+    <!-- ── FINAL BONUS ── -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:9px;color:#888">All amounts in AUD. This notice is confidential.</div>
+      <div style="font-weight:800;font-size:17px;color:#166534">Final Bonus: &nbsp;$${r.total.toFixed(2)}</div>
+    </div>
+    ${HR}
+    <div style="display:flex;justify-content:flex-end;font-size:10px;color:#555">
+      Sign 签名: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:2px">
+      <div style="width:220px;border-bottom:1px solid #999;height:1px"></div>
+    </div>
+    <div style="height:8px"></div>
+  </div>`;
+}
+
+function exportNoticePDF(allPeople){
+  if(!results.length){alert('请先上传数据');return;}
+  let toExport = allPeople ? results.filter(r=>r.trucks>0) : [results.find(r=>r.name===document.getElementById('prevP').value)];
+  toExport = toExport.filter(Boolean);
+  if(!toExport.length){alert('没有可导出的人员');return;}
+
+  const pages = toExport.map((r,i)=>{
+    const pb = i>0 ? 'style="page-break-before:always"' : '';
+    return `<div ${pb}>${buildNoticeHTML(r)}</div>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Loader Notice – ${dateFrom} ~ ${dateTo}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#fff;font-family:'Microsoft YaHei','PingFang SC','Hiragino Sans GB',Arial,sans-serif;color:#111}
+  @media print{
+    @page{
+      margin:10mm 12mm;
+      size:A4 portrait;
+    }
+    /* Hide browser-generated header/footer (date, URL, page number) */
+    html{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
+    .no-print{display:none!important}
+    div[style*="page-break-before:always"]{page-break-before:always}
+    /* Force all background colors and images to print */
+    *{
+      -webkit-print-color-adjust:exact!important;
+      print-color-adjust:exact!important;
+      color-adjust:exact!important;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="no-print" style="background:#1a1d27;color:#e8eaf0;padding:12px 20px;display:flex;align-items:center;gap:12px;font-family:Arial,sans-serif;font-size:13px;position:sticky;top:0;z-index:99">
+  <strong>Loader Notice</strong>
+  <span style="color:#6b7280">${toExport.length}人 · ${dateFrom} ~ ${dateTo}</span>
+  <button onclick="window.print()" style="margin-left:auto;padding:7px 20px;background:#22c55e;color:#000;border:none;border-radius:5px;font-size:13px;font-weight:600;cursor:pointer">🖨 打印 / 另存为 PDF</button>
+  <button onclick="window.close()" style="padding:7px 14px;background:#374151;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer">✕ 关闭</button>
+</div>
+${pages}
+</body></html>`;
+
+  const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+  const url  = URL.createObjectURL(blob);
+  const win  = window.open(url, '_blank');
+  if(!win) alert('请允许弹出窗口后重试');
+  setTimeout(()=>URL.revokeObjectURL(url), 60000);
+}
+
+// ── Loader Name Management ────────────────────────────────────────────────
+const DEFAULT_KNOWN=['Geo Casper Chong','Shengchih Hung','Tuan Tran','Xingjiang Xu','Yubiao Wu','ZhiGang Deng','Tingyi Xie'];
+
+function renderLoaderNames(){
+  const wrap=document.getElementById('loaderNameRows');
+  if(!wrap)return;
+  wrap.innerHTML=KNOWN.map((name,i)=>`
+    <div style="display:flex;align-items:center;gap:6px">
+      <span style="font-size:10px;color:var(--mt);font-family:var(--mo);min-width:18px">${i+1}.</span>
+      <input type="text" value="${name.replace(/"/g,'&quot;')}" data-idx="${i}"
+        style="flex:1;padding:5px 7px;background:var(--bg);border:1px solid var(--bd);border-radius:5px;color:var(--tx);font-size:11px;font-family:var(--mo);outline:none"
+        onfocus="this.style.borderColor='var(--gn)'" onblur="this.style.borderColor='var(--bd)'"
+        placeholder="姓名（与Excel一致）">
+      ${KNOWN.length>1?`<button class="btn btn-s" onclick="removeLoaderName(${i})" style="color:var(--rd);padding:3px 7px;flex-shrink:0">✕</button>`:''}
+    </div>`).join('');
+}
+
+function addLoaderName(){
+  KNOWN.push('');
+  renderLoaderNames();
+  // Focus the new input
+  const inputs=document.querySelectorAll('#loaderNameRows input[type=text]');
+  if(inputs.length)inputs[inputs.length-1].focus();
+}
+
+function removeLoaderName(i){
+  KNOWN.splice(i,1);
+  renderLoaderNames();
+}
+
+function saveLoaderNames(){
+  const inputs=document.querySelectorAll('#loaderNameRows input[type=text]');
+  const newNames=[];
+  inputs.forEach(inp=>{const v=inp.value.trim();if(v)newNames.push(v);});
+  if(!newNames.length){alert('请至少保留一名 Loader');return;}
+  KNOWN.length=0;newNames.forEach(n=>KNOWN.push(n));
+  ls_save();showSaved('sv6');
+  const msg=document.getElementById('loaderNameMsg');
+  if(msg){msg.style.display='block';msg.textContent='✓ 名单已保存，共 '+KNOWN.length+' 人';setTimeout(()=>msg.style.display='none',3000);}
+  renderLoaderNames();
+  recalcAll();
+}
+
+function resetLoaderNames(){
+  if(!confirm('确定要恢复默认 Loader 名单吗？'))return;
+  KNOWN.length=0;DEFAULT_KNOWN.forEach(n=>KNOWN.push(n));
+  renderLoaderNames();
+  ls_save();showSaved('sv6');
+  recalcAll();
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+function init(){
+  // Always start with defaults first
+  STBL=JSON.parse(JSON.stringify(DEF_ST));
+  TIERS=JSON.parse(JSON.stringify(DEF_TIERS));
+  EFF_TIERS=JSON.parse(JSON.stringify(DEF_EFF_TIERS));
+  const saved=applyLS();
+  buildGrid();renderTiers();renderEffTiers();renderLoaderNames();updateCapLabels();updateFormulaDisplay();
+  const si=document.getElementById('si');
+  if(saved){si.classList.add('on');setTimeout(()=>si.classList.remove('on'),3000);}
+}
+init();
+</script>
+<div id="printArea"></div>
+
+<!-- ── PASSWORD MODAL ── -->
+<div id="pwModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:28px 32px;width:320px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+    <div style="font-size:32px;margin-bottom:8px">🔒</div>
+    <div style="font-size:14px;font-weight:600;margin-bottom:4px" id="pwTitle">配置页面</div>
+    <div style="font-size:11px;color:var(--mt);margin-bottom:16px;font-family:var(--mo)">请输入密码以继续 / Enter password</div>
+    <input type="password" id="pwInput" placeholder="密码..." autocomplete="off"
+      style="width:100%;padding:9px 12px;background:var(--bg);border:1px solid var(--bd);border-radius:6px;color:var(--tx);font-size:14px;font-family:var(--mo);outline:none;text-align:center;margin-bottom:8px;letter-spacing:.15em"
+      onkeydown="if(event.key==='Enter')pwSubmit()"
+      oninput="document.getElementById('pwErr').style.display='none'">
+    <div id="pwErr" style="display:none;font-size:10px;color:var(--rd);margin-bottom:8px;font-family:var(--mo)">❌ 密码错误，请重试</div>
+    <div style="display:flex;gap:8px;justify-content:center;margin-top:4px">
+      <button onclick="pwCancel()" style="padding:7px 20px;border-radius:5px;border:1px solid var(--bd);background:var(--sf2);color:var(--mt);font-size:12px;cursor:pointer;font-family:var(--sa)">取消</button>
+      <button onclick="pwSubmit()" style="padding:7px 20px;border-radius:5px;border:1px solid var(--gn);background:var(--gn);color:#000;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sa)">确认</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Password protection ───────────────────────────────────────────────────
+const PW='finesteel';
+const PROTECTED=['scoretable','settings'];
+let _pwUnlocked=false; // session unlock flag
+let _pwPending=null;   // {n, el} waiting after correct password
+let _pwNavEl=null;
+
+function gT_orig(n,el){
+  document.querySelectorAll('.ni2').forEach(t=>t.classList.remove('act'));
+  document.querySelectorAll('.pnl').forEach(p=>p.classList.remove('act'));
+  if(el)el.classList.add('act');
+  document.getElementById('p-'+n).classList.add('act');
+  if(n==='ranking')renderRanking();
+  if(n==='persons')renderPersonCards();
+  if(n==='trucks')renderTrucks();
+  if(n==='shift')renderShift();
+  if(n==='pdf')renderPDF();
+}
+
+// Override gT to intercept protected pages
+const _gT_original=window.gT;
+window.gT=function(n,el){
+  if(PROTECTED.includes(n)&&!_pwUnlocked){
+    _pwPending={n,el};
+    showPwModal(n);
+  } else {
+    gT_orig(n,el);
+  }
+};
+
+function showPwModal(n){
+  const titles={scoretable:'计分表 / Score Table',settings:'参数设置 / Settings'};
+  document.getElementById('pwTitle').textContent=titles[n]||n;
+  document.getElementById('pwInput').value='';
+  document.getElementById('pwErr').style.display='none';
+  const m=document.getElementById('pwModal');
+  m.style.display='flex';
+  setTimeout(()=>document.getElementById('pwInput').focus(),50);
+}
+
+function pwSubmit(){
+  const val=document.getElementById('pwInput').value;
+  if(val===PW){
+    _pwUnlocked=true;
+    document.getElementById('pwModal').style.display='none';
+    if(_pwPending){gT_orig(_pwPending.n,_pwPending.el);_pwPending=null;}
+  } else {
+    document.getElementById('pwErr').style.display='block';
+    document.getElementById('pwInput').value='';
+    document.getElementById('pwInput').focus();
+  }
+}
+
+function pwCancel(){
+  document.getElementById('pwModal').style.display='none';
+  _pwPending=null;
+}
+
+// Close modal on backdrop click
+document.getElementById('pwModal').addEventListener('click',function(e){
+  if(e.target===this)pwCancel();
+});
+</script>
+
+</body>
+</html>
