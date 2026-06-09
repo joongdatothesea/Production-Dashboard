@@ -161,7 +161,7 @@ export const fetchPMLogs = async (machineName: string): Promise<PMLog[]> => {
 /** Get all machines from Pro-Maintenance */
 export const fetchMachines = async (): Promise<MachineInfo[]> => {
   const client = getClient();
-  const { data, error } = await (client as any).from('machines').select('name,model,serial_number');
+  const { data, error } = await (client as any).from('machines').select('name,model,serial_number,section,image_url');
   if (error) { console.error('fetchMachines:', error.message); return []; }
-  return (data ?? []).map(m => ({ name: m.name, model: m.model, serialNumber: m.serial_number }));
+  return (data ?? []).map(m => ({ name: m.name, model: m.model, serialNumber: m.serial_number, section: m.section, imageUrl: m.image_url }));
 };

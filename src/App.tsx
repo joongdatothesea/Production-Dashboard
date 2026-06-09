@@ -6161,6 +6161,7 @@ const MachineSection: React.FC<SectionProps> = ({ color }) => {
     try { return JSON.parse(localStorage.getItem('machineStatuses') || '{}'); } catch { return {}; }
   });
   const [statusModal, setStatusModal] = useState<string | null>(null);
+  const [selectedMachinePro, setSelectedMachinePro] = useState<string | null>(null);
   const [quickDt, setQuickDt]         = useState<{ machine:string; dur:number; type:string; shift:'AM'|'PM'; reason:string } | null>(null);
 
   // ── Work Order state (4.3.3) ──────────────────────────────────────────────
@@ -6864,58 +6865,251 @@ const MachineSection: React.FC<SectionProps> = ({ color }) => {
         );
       })()}
 
-      {/* ══ (old Machine Status block - now inside floor plan card) ══ */}
+      {/* ══ Machine Status — Pro Style ══════════════════════════════════ */}
       {(() => {
-        const dotCls: Record<string,string> = { run:'bg-emerald-500', warn:'bg-amber-400', error:'bg-red-500 animate-pulse', idle:'bg-slate-300' };
-        const resClr = (r: string) => ({ Fixed:'bg-emerald-100 text-emerald-700', Temporary:'bg-amber-100 text-amber-700', 'Not Fixed':'bg-red-100 text-red-600', Observation:'bg-blue-100 text-blue-700' }[r] ?? 'bg-slate-100 text-slate-500');
+        const MACHINE_CATEGORIES: Record<string, { label: string; sublabel: string; color: string; icon: React.ReactNode }> = {
+          production: { label: '生产设备', sublabel: 'PRODUCTION',  color: '#3b82f6', icon: <Monitor size={13}/> },
+          logistics:  { label: '物流叉车', sublabel: 'LOGISTICS',   color: '#f59e0b', icon: <Truck size={13}/> },
+          crane:      { label: '起重设备', sublabel: 'CRANE',       color: '#8b5cf6', icon: <Activity size={13}/> },
+          other:      { label: '其他设备', sublabel: 'OTHER',       color: '#64748b', icon: <Cog size={13}/> },
+        };
+
+        const getSectionForMachine = (name: string): string => {
+          const sup = supabaseMachines.find(m => m.name === name);
+          if (sup?.section) return sup.section;
+          const lower = name.toLowerCase();
+          if (['toyota','hyster','nissan','jcb'].some(k => lower.includes(k))) return 'logistics';
+          if (lower.includes('crane')) return 'crane';
+          return 'production';
+        };
+
+        const getImageForMachine = (name: string): string => {
+          const sup = supabaseMachines.find(m => m.name === name);
+          if (sup?.imageUrl) return sup.imageUrl;
+          return `https://picsum.photos/seed/${encodeURIComponent(name)}pro/400/220`;
+        };
+
+        const getHealthForMachine = (name: string): number => {
+          const recs = maintRecords.filter(r => r.machineName === name);
+          if (!recs.length) return 100;
+          const recent = recs.slice(0, 20);
+          const penalty = recent.filter(r => r.isRecurring).length * 4
+                        + recent.filter(r => r.repairResult === 'Not Fixed').length * 8
+                        + recent.filter(r => r.repairResult === 'Temporary').length * 3;
+          return Math.max(50, 100 - penalty);
+        };
+
+        const grouped: Record<string, typeof allMachines> = {};
+        for (const m of allMachines) {
+          const sec = getSectionForMachine(m.name);
+          if (!grouped[sec]) grouped[sec] = [];
+          grouped[sec].push(m);
+        }
+
+        const dotColor = (ds: string) => ({ run:'#10b981', warn:'#f59e0b', error:'#ef4444', idle:'#cbd5e1' }[ds] ?? '#cbd5e1');
+        const barCls = (v: number) => v >= 90 ? 'bg-emerald-500' : v >= 75 ? 'bg-amber-400' : 'bg-red-500';
+        const numCls = (v: number) => v >= 90 ? 'text-emerald-600' : v >= 75 ? 'text-amber-500' : 'text-red-500';
 
         return (
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            {/* Header */}
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
               <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Machine Status — 机器状态</span>
               <div className="flex gap-3 text-[8px] text-slate-400">
-                {[['bg-emerald-500','Running'],['bg-amber-400','Restricted'],['bg-red-500','Down'],['bg-slate-300','No Plan']].map(([c,l])=>(
-                  <span key={l} className="flex items-center gap-1"><span className={cn('w-2 h-2 rounded-full',c)}/>{l}</span>
+                {[['#10b981','Running'],['#f59e0b','Restricted'],['#ef4444','Down'],['#cbd5e1','No Plan']].map(([c,l])=>(
+                  <span key={l} className="flex items-center gap-1">
+                    <span className="inline-block w-2 h-2 rounded-full" style={{backgroundColor:c}}/>
+                    {l}
+                  </span>
                 ))}
               </div>
             </div>
-            <div className="grid grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 divide-x divide-y divide-slate-100">
-              {allMachines.map(m => {
-                const st = getMachineStatus(m.name);
-                const recs = maintRecords.filter(r => r.machineName === m.name);
-                const latest = recs[0];
+
+            {/* Machine detail modal */}
+            <AnimatePresence>
+              {selectedMachinePro && (() => {
+                const recs = maintRecords.filter(r => r.machineName === selectedMachinePro);
                 const monthDtH = recs.filter(r => { const d = new Date(r.date); return d.getFullYear()===msNow.getFullYear()&&d.getMonth()===msNow.getMonth(); }).reduce((s,r)=>s+(r.totalDowntime||0),0);
-                const avail = shiftPlanH > 0 ? Math.max(0, Math.round((1 - monthDtH/shiftPlanH)*100)) : null;
-                const supaStatus = latest ? ({ Running:'run', Restricted:'warn', Down:'error' }[latest.machineStatusAfter] ?? st) : st;
-                const ds = machineStatuses[m.name] ?? supaStatus;
+                const avail = shiftPlanH > 0 ? Math.max(0, Math.round((1 - monthDtH/shiftPlanH)*100)) : 100;
+                const health = getHealthForMachine(selectedMachinePro);
+                const supaStatus = recs[0] ? ({ Running:'run', Restricted:'warn', Down:'error' }[recs[0].machineStatusAfter] ?? 'idle') : 'idle';
+                const ds = machineStatuses[selectedMachinePro] ?? supaStatus;
+                const statusLabel = { run:'RUNNING MODE', warn:'RESTRICTED', error:'DOWN', idle:'NO PLAN' }[ds] ?? 'NO PLAN';
+                const sColor = dotColor(ds);
+
+                const faultGroups: Record<string, typeof recs> = {};
+                for (const r of recs.slice(0, 60)) {
+                  const area = r.faultArea || 'General';
+                  if (!faultGroups[area]) faultGroups[area] = [];
+                  faultGroups[area].push(r);
+                }
+
                 return (
-                  <div key={m.name} onClick={()=>setStatusModal(m.name)}
-                    className="flex flex-col gap-1.5 p-3 hover:bg-slate-50/60 cursor-pointer">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1"><Cpu size={11} className="text-slate-400"/><span className="text-[10px] font-black text-slate-800 truncate">{m.name}</span></div>
-                      <div className={cn('w-2 h-2 rounded-full shrink-0', dotCls[ds]??'bg-slate-300')}/>
-                    </div>
-                    <div className={cn('text-[7px] font-bold', ds==='run'?'text-emerald-600':ds==='error'?'text-red-500':ds==='warn'?'text-amber-500':'text-slate-400')}>
-                      {ds==='run'?'Running':ds==='error'?'Down':ds==='warn'?'Restricted':'No Plan'}
-                    </div>
-                    {avail != null && (
+                  <motion.div key="machine-modal" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+                    className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+                    onClick={()=>setSelectedMachinePro(null)}>
+                    <motion.div initial={{scale:0.95,opacity:0}} animate={{scale:1,opacity:1}} exit={{scale:0.95,opacity:0}}
+                      className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
+                      onClick={e=>e.stopPropagation()}>
+                      {/* Modal header */}
+                      <div className="flex items-center gap-3 p-4 border-b border-slate-100 shrink-0">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{backgroundColor:sColor+'20'}}>
+                          <Monitor size={18} style={{color:sColor}}/>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h2 className="text-lg font-black text-slate-800">{selectedMachinePro}</h2>
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-black text-white shrink-0" style={{backgroundColor:sColor}}>{statusLabel}</span>
+                          </div>
+                          <div className="flex gap-4 mt-0.5">
+                            <span className="text-[10px] text-slate-400">AVAIL <span className={cn('font-black', numCls(avail))}>{avail}%</span></span>
+                            <span className="text-[10px] text-slate-400">HEALTH <span className={cn('font-black', numCls(health))}>{health}%</span></span>
+                            <span className="text-[10px] text-slate-400">RECORDS <span className="font-black text-slate-700">{recs.length}</span></span>
+                          </div>
+                        </div>
+                        <button onClick={()=>setSelectedMachinePro(null)} className="text-slate-300 hover:text-slate-500 shrink-0 p-1"><X size={16}/></button>
+                      </div>
+
+                      {/* Modal body */}
+                      <div className="overflow-y-auto flex-1 p-4 space-y-3">
+                        {/* Subsystem risk matrix */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="w-5 h-5 rounded-md flex items-center justify-center bg-red-100"><Activity size={11} className="text-red-500"/></div>
+                            <div>
+                              <span className="text-[11px] font-black text-slate-700">子系统风险审计矩阵</span>
+                              <span className="ml-2 text-[9px] text-slate-400">基于历史日志数据的动态组件失效预测</span>
+                            </div>
+                          </div>
+                          {Object.keys(faultGroups).length > 0 ? (
+                            <div className="space-y-2">
+                              {Object.entries(faultGroups).map(([area, areaRecs]) => {
+                                const totalDt = areaRecs.reduce((s,r)=>s+(r.totalDowntime||0),0);
+                                const notFixed = areaRecs.filter(r=>r.repairResult==='Not Fixed'||r.repairResult==='Temporary').length;
+                                const score = Math.max(0, Math.round(100 - notFixed*10 - Math.min(totalDt,5)*4));
+                                const sColorScore = score>=90?'#10b981':score>=75?'#f59e0b':'#ef4444';
+                                return (
+                                  <div key={area} className="border border-slate-100 rounded-xl p-3">
+                                    <div className="flex items-center justify-between mb-2.5">
+                                      <span className="text-[10px] font-black text-slate-700 uppercase tracking-wide">{area}</span>
+                                      <span className="text-sm font-black tabular-nums px-2.5 py-0.5 rounded-lg text-white" style={{backgroundColor:sColorScore}}>{score}%</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      {areaRecs.slice(0,4).map((r,i) => {
+                                        const scoreVal = r.repairResult==='Fixed'?100:r.repairResult==='Temporary'?70:r.repairResult==='Not Fixed'?40:85;
+                                        const scoreC = scoreVal>=90?'#10b981':scoreVal>=75?'#f59e0b':'#ef4444';
+                                        return (
+                                          <div key={i} className="bg-slate-50 rounded-lg p-2">
+                                            <div className="flex items-center justify-between mb-1">
+                                              <span className="text-[8px] font-bold text-slate-600 truncate max-w-[100px]">{r.faultReason||r.faultDescription||'Fault'}</span>
+                                              <span className="text-[8px] font-black text-slate-500 shrink-0">{scoreVal}/100</span>
+                                            </div>
+                                            <div className="h-0.5 bg-slate-200 rounded-full overflow-hidden">
+                                              <div className="h-full rounded-full" style={{width:`${scoreVal}%`, backgroundColor:scoreC}}/>
+                                            </div>
+                                            <div className="flex items-center justify-between mt-1">
+                                              <span className="text-[7px] text-slate-400">{r.date}</span>
+                                              <span className="text-[7px] font-bold" style={{color:scoreC}}>{r.repairResult||'—'}</span>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center py-8 text-slate-300 gap-2">
+                              <CheckCircle2 size={22}/><span className="text-[9px] font-bold">暂无维修记录 — 同步保养系统后显示</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                );
+              })()}
+            </AnimatePresence>
+
+            {/* Groups */}
+            <div className="divide-y divide-slate-50">
+              {Object.entries(grouped).map(([section, sectionMachines]) => {
+                const cat = MACHINE_CATEGORIES[section] ?? MACHINE_CATEGORIES.other;
+                return (
+                  <div key={section} className="p-4">
+                    {/* Group header */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0" style={{backgroundColor:cat.color}}>
+                        {cat.icon}
+                      </div>
                       <div>
-                        <div className="flex justify-between items-baseline">
-                          <span className="text-[6px] text-slate-400">AVAIL</span>
-                          <span className={cn('text-[11px] font-black tabular-nums', avail>=90?'text-emerald-600':avail>=75?'text-amber-500':'text-red-500')}>{avail}%</span>
-                        </div>
-                        <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
-                          <div className={cn('h-full', avail>=90?'bg-emerald-500':avail>=75?'bg-amber-400':'bg-red-500')} style={{width:`${avail}%`}}/>
-                        </div>
+                        <span className="text-sm font-black text-slate-800">{cat.label}</span>
+                        <span className="ml-1.5 text-[9px] font-bold text-slate-400">{cat.sublabel}</span>
+                        <span className="ml-1.5 text-[8px] font-bold text-slate-300">FACTORY OPERATIONS ASSET GROUP</span>
                       </div>
-                    )}
-                    {latest && (
-                      <div className="text-[6px] text-slate-400 leading-relaxed">
-                        {latest.date}
-                        {latest.repairResult && <span className={cn('ml-1 px-1 py-0.5 rounded text-[6px] font-bold', resClr(latest.repairResult))}>{latest.repairResult}</span>}
-                        {monthDtH > 0 && <span className="ml-1 text-red-400 font-bold">↓{monthDtH.toFixed(1)}h</span>}
-                      </div>
-                    )}
+                      <button className="ml-auto flex items-center gap-1 text-[8px] font-bold border border-slate-200 rounded-lg px-2.5 py-1 text-slate-500 hover:bg-slate-50 transition-colors">
+                        <Plus size={10}/> 添加设备
+                      </button>
+                    </div>
+
+                    {/* Machine cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                      {sectionMachines.map(m => {
+                        const recs = maintRecords.filter(r => r.machineName === m.name);
+                        const monthDtH = recs.filter(r => { const d = new Date(r.date); return d.getFullYear()===msNow.getFullYear()&&d.getMonth()===msNow.getMonth(); }).reduce((s,r)=>s+(r.totalDowntime||0),0);
+                        const avail = shiftPlanH > 0 ? Math.max(0, Math.round((1 - monthDtH/shiftPlanH)*100)) : 100;
+                        const health = getHealthForMachine(m.name);
+                        const supaStatus = recs[0] ? ({ Running:'run', Restricted:'warn', Down:'error' }[recs[0].machineStatusAfter] ?? 'idle') : 'idle';
+                        const ds = machineStatuses[m.name] ?? supaStatus;
+                        const dc = dotColor(ds);
+                        const imgUrl = getImageForMachine(m.name);
+
+                        return (
+                          <div key={m.name} onClick={()=>setSelectedMachinePro(m.name)}
+                            className="rounded-xl border border-slate-100 overflow-hidden cursor-pointer hover:shadow-md hover:border-blue-100 transition-all group bg-white select-none">
+                            {/* Image */}
+                            <div className="relative overflow-hidden bg-slate-100" style={{height:110}}>
+                              <img src={imgUrl} alt={m.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                onError={e=>{ (e.target as HTMLImageElement).src='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="220" viewBox="0 0 400 220"><rect fill="%23f1f5f9" width="400" height="220"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%2394a3b8" font-size="14" font-family="sans-serif">'+encodeURIComponent(m.name)+'</text></svg>'; }}
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"/>
+                              <div className="absolute top-2 right-2 w-3 h-3 rounded-full border-2 border-white shadow" style={{backgroundColor:dc}}/>
+                            </div>
+                            {/* Info */}
+                            <div className="p-2.5">
+                              <div className="flex items-center gap-1 mb-2">
+                                <Monitor size={9} className="text-slate-400 shrink-0"/>
+                                <span className="text-[10px] font-black text-slate-800 truncate">{m.name}</span>
+                              </div>
+                              <div className="space-y-1.5">
+                                {/* AVAIL */}
+                                <div>
+                                  <div className="flex justify-between items-baseline mb-0.5">
+                                    <span className="text-[7px] font-bold text-slate-400">AVAIL</span>
+                                    <span className={cn('text-[9px] font-black tabular-nums', numCls(avail))}>{avail}%</span>
+                                  </div>
+                                  <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+                                    <div className={cn('h-full rounded-full', barCls(avail))} style={{width:`${avail}%`}}/>
+                                  </div>
+                                </div>
+                                {/* HEALTH */}
+                                <div>
+                                  <div className="flex justify-between items-baseline mb-0.5">
+                                    <span className="text-[7px] font-bold text-slate-400">HEALTH</span>
+                                    <span className={cn('text-[9px] font-black tabular-nums', numCls(health))}>{health}%</span>
+                                  </div>
+                                  <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+                                    <div className={cn('h-full rounded-full', barCls(health))} style={{width:`${health}%`}}/>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 );
               })}
