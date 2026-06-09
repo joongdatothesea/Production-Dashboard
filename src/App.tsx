@@ -6162,6 +6162,11 @@ const MachineSection: React.FC<SectionProps> = ({ color }) => {
   });
   const [statusModal, setStatusModal] = useState<string | null>(null);
   const [selectedMachinePro, setSelectedMachinePro] = useState<string | null>(null);
+  const [isMatrixExpanded, setIsMatrixExpanded] = useState(true);
+  const [proPreviewImage, setProPreviewImage] = useState<string | null>(null);
+  const [machineProConfig, setMachineProConfig] = useState<Record<string, Record<string, string[]>>>(() => {
+    try { return JSON.parse(localStorage.getItem('systemConfig') || '{}'); } catch { return {}; }
+  });
   const [quickDt, setQuickDt]         = useState<{ machine:string; dur:number; type:string; shift:'AM'|'PM'; reason:string } | null>(null);
 
   // ── Work Order state (4.3.3) ──────────────────────────────────────────────
@@ -6865,260 +6870,466 @@ const MachineSection: React.FC<SectionProps> = ({ color }) => {
         );
       })()}
 
-      {/* ══ Machine Status — Pro Style ══════════════════════════════════ */}
+      {/* ══ Machine Status — Pro Style (faithful port from Pro-Maintenance) ══ */}
       {(() => {
-        const MACHINE_CATEGORIES: Record<string, { label: string; sublabel: string; color: string; icon: React.ReactNode }> = {
-          production: { label: '生产设备', sublabel: 'PRODUCTION',  color: '#3b82f6', icon: <Monitor size={13}/> },
-          logistics:  { label: '物流叉车', sublabel: 'LOGISTICS',   color: '#f59e0b', icon: <Truck size={13}/> },
-          crane:      { label: '起重设备', sublabel: 'CRANE',       color: '#8b5cf6', icon: <Activity size={13}/> },
-          other:      { label: '其他设备', sublabel: 'OTHER',       color: '#64748b', icon: <Cog size={13}/> },
+        // ── Helpers ─────────────────────────────────────────────────────────
+        const isForklift = (name: string) => {
+          const n = name.toLowerCase();
+          return n.includes('forklift') || n.includes('叉车') || n.includes('toyota') || n.includes('nissan') || n.includes('hyster') || n === 'jcb';
+        };
+        const isCrane = (name: string) => {
+          const n = name.toLowerCase();
+          return n.includes('crane') || n.includes('行车') || n.includes('天车') || /^[gc]\d+/.test(n);
+        };
+        const getCraneBay = (name: string): 1 | 2 | 0 => {
+          const n = name.toUpperCase();
+          if (/^G[1-5]($|\s)/.test(n) || /^C1[1-6]($|\s)/.test(n)) return 1;
+          if (/^C2[1-6]($|\s)/.test(n)) return 2;
+          return 0;
         };
 
-        const getSectionForMachine = (name: string): string => {
-          const sup = supabaseMachines.find(m => m.name === name);
-          if (sup?.section) return sup.section;
-          const lower = name.toLowerCase();
-          if (['toyota','hyster','nissan','jcb'].some(k => lower.includes(k))) return 'logistics';
-          if (lower.includes('crane')) return 'crane';
-          return 'production';
+        // ── calculateHealth (adapted to Production-Dashboard MaintRecord) ──
+        const calculateHealth = (machine: string) => {
+          const machineRecords = maintRecords.filter(r => r.machineName === machine);
+          const machineSpecificConfig = (machineProConfig[machine] || machineProConfig['DEFAULT_TEMPLATE'] || {}) as Record<string, string[]>;
+          const now = new Date();
+          const calcStart = new Date(localStorage.getItem('app_calc_start_date') || '2025-01-01');
+
+          const statsByMonth: Record<string, { scheduled: number; downtime: number; plannedOff: number; yr: number; mo: number }> = {};
+          let aggregatePlannedOff = 0;
+          let aggregateDowntime = 0;
+
+          machineRecords.forEach(r => {
+            const d = new Date(r.date);
+            const yr = d.getFullYear(); const mo = d.getMonth() + 1;
+            const mKey = `${yr}-${String(mo).padStart(2,'0')}`;
+            if (!statsByMonth[mKey]) statsByMonth[mKey] = { scheduled:0, downtime:0, plannedOff:0, yr, mo };
+            const isPlanned = r.maintenanceType === 'Non-Production' || r.maintenanceType === 'NON_PRODUCTION';
+            if (isPlanned) {
+              statsByMonth[mKey].plannedOff += (r.repairTime || 0);
+              aggregatePlannedOff += (r.repairTime || 0);
+            } else {
+              statsByMonth[mKey].downtime += (r.totalDowntime || 0);
+              aggregateDowntime += (r.totalDowntime || 0);
+            }
+          });
+
+          const diffDays = Math.max(1, Math.ceil((now.getTime() - calcStart.getTime()) / 86400000));
+          const aggregateCalendar = diffDays * 14.5;
+
+          const allTimeHistory = Object.keys(statsByMonth).sort().map(key => {
+            const s = statsByMonth[key];
+            const daysInMonth = new Date(s.yr, s.mo, 0).getDate();
+            const calendarHrs = daysInMonth * 14.5;
+            const scheduled = calendarHrs - s.plannedOff;
+            const availability = scheduled > 0 ? Math.max(0, Math.min(100, ((scheduled - s.downtime) / scheduled) * 100)) : 0;
+            return {
+              monthKey: key, year: s.yr, month: s.mo,
+              label: `${new Date(s.yr, s.mo-1).toLocaleString('default', {month:'short'})} ${String(s.yr).slice(2)}`,
+              availability: parseFloat(availability.toFixed(1)),
+              scheduled, downtime: s.downtime, plannedOff: s.plannedOff,
+            };
+          });
+
+          const currentMKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+          const curData = allTimeHistory.find(h => h.monthKey === currentMKey) || { availability: 0 };
+
+          const systems: { name:string; score:number; status:'Good'|'Warning'|'Critical'; components:{name:string;score:number;riskLevel:string;issueCount:number;deductions:{type:string;val:number;label:string}[]}[] }[] = [];
+          const ninetyDaysAgo = new Date(); ninetyDaysAgo.setDate(now.getDate() - 90);
+
+          (Object.entries(machineSpecificConfig) as [string, string[]][]).forEach(([sysName, componentNames]) => {
+            const components: typeof systems[0]['components'] = [];
+            let sysScoreSum = 0;
+            componentNames.forEach(compName => {
+              const compRecords = machineRecords.filter(r =>
+                r.faultArea === compName && new Date(r.date) >= ninetyDaysAgo &&
+                r.maintenanceType !== 'Non-Production' && r.maintenanceType !== 'NON_PRODUCTION'
+              );
+              let score = 100;
+              const deductions: typeof systems[0]['components'][0]['deductions'] = [];
+              const freqDec = Math.min(20, compRecords.length * 5);
+              if (freqDec > 0) { score -= freqDec; deductions.push({ type:'FREQ', val:freqDec, label:`Frequency (-${freqDec})` }); }
+              const sorted = [...compRecords].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+              if (sorted.length > 0) {
+                const daysSince = Math.floor((now.getTime() - new Date(sorted[0].date).getTime()) / 86400000);
+                const recDec = daysSince<=7?15:daysSince<=30?10:daysSince<=90?5:0;
+                if (recDec > 0) { score -= recDec; deductions.push({ type:'TIME', val:recDec, label:`Recency: ${daysSince}d ago (-${recDec})` }); }
+                const diff = Number(sorted[0].difficulty);
+                const complexDec = diff===2?3:diff===3?6:diff===4?10:diff===5?15:0;
+                if (complexDec > 0) { score -= complexDec; deductions.push({ type:'DIFF', val:complexDec, label:`Complexity: L${diff} (-${complexDec})` }); }
+              }
+              score = Math.max(0, score);
+              const riskLevel = score<50?'Critical':score<70?'Warning':score<85?'Monitor':'Healthy';
+              components.push({ name:compName, score, riskLevel, issueCount:compRecords.length, deductions });
+              sysScoreSum += score;
+            });
+            const sysAvg = componentNames.length > 0 ? Math.round(sysScoreSum / componentNames.length) : 100;
+            systems.push({ name:sysName, score:sysAvg, status:sysAvg<50?'Critical':sysAvg<70?'Warning':'Good', components: components.sort((a,b)=>a.score-b.score) });
+          });
+
+          const totalScheduled = aggregateCalendar - aggregatePlannedOff;
+          const globalAvailability = totalScheduled > 0 ? ((totalScheduled - aggregateDowntime) / totalScheduled) * 100 : 100;
+          const latestRecord = [...machineRecords].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+          let machineStatusCalc: 'Running'|'Down'|'Warning'|'Idle' = 'Running';
+          if (latestRecord?.machineStatusAfter === 'Down') machineStatusCalc = 'Down';
+          else if (globalAvailability < 85) machineStatusCalc = 'Warning';
+
+          return {
+            status: machineStatusCalc,
+            currentMonthAvailability: curData.availability.toFixed(1),
+            allTimeHistory, systems,
+            plannedRecords: machineRecords.filter(r => r.maintenanceType==='Non-Production'||r.maintenanceType==='NON_PRODUCTION').sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime()),
+            downtimeRecords: machineRecords.filter(r => r.totalDowntime > 0 && r.maintenanceType !== 'Non-Production').sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime()),
+            totalCalendarHours: parseFloat(aggregateCalendar.toFixed(1)),
+            totalPlannedOffHours: aggregatePlannedOff,
+            totalScheduledHours: parseFloat(totalScheduled.toFixed(1)),
+            totalDowntimeHours: aggregateDowntime,
+            globalAvailability: parseFloat(globalAvailability.toFixed(1)),
+          };
         };
 
-        const getImageForMachine = (name: string): string => {
-          const sup = supabaseMachines.find(m => m.name === name);
-          if (sup?.imageUrl) return sup.imageUrl;
-          return `https://picsum.photos/seed/${encodeURIComponent(name)}pro/400/220`;
-        };
-
-        const getHealthForMachine = (name: string): number => {
-          const recs = maintRecords.filter(r => r.machineName === name);
-          if (!recs.length) return 100;
-          const recent = recs.slice(0, 20);
-          const penalty = recent.filter(r => r.isRecurring).length * 4
-                        + recent.filter(r => r.repairResult === 'Not Fixed').length * 8
-                        + recent.filter(r => r.repairResult === 'Temporary').length * 3;
-          return Math.max(50, 100 - penalty);
-        };
-
-        const grouped: Record<string, typeof allMachines> = {};
-        for (const m of allMachines) {
-          const sec = getSectionForMachine(m.name);
-          if (!grouped[sec]) grouped[sec] = [];
-          grouped[sec].push(m);
-        }
-
-        const dotColor = (ds: string) => ({ run:'#10b981', warn:'#f59e0b', error:'#ef4444', idle:'#cbd5e1' }[ds] ?? '#cbd5e1');
-        const barCls = (v: number) => v >= 90 ? 'bg-emerald-500' : v >= 75 ? 'bg-amber-400' : 'bg-red-500';
-        const numCls = (v: number) => v >= 90 ? 'text-emerald-600' : v >= 75 ? 'text-amber-500' : 'text-red-500';
-
-        return (
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
-              <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Machine Status — 机器状态</span>
-              <div className="flex gap-3 text-[8px] text-slate-400">
-                {[['#10b981','Running'],['#f59e0b','Restricted'],['#ef4444','Down'],['#cbd5e1','No Plan']].map(([c,l])=>(
-                  <span key={l} className="flex items-center gap-1">
-                    <span className="inline-block w-2 h-2 rounded-full" style={{backgroundColor:c}}/>
-                    {l}
-                  </span>
-                ))}
+        // ── MachineCard ──────────────────────────────────────────────────────
+        const MachineCardPro = ({ m }: { m: string }) => {
+          const health = calculateHealth(m);
+          const avgScore = health.systems.length > 0 ? Math.round(health.systems.reduce((a,b)=>a+b.score,0)/health.systems.length) : 100;
+          const isFk = isForklift(m); const isCr = isCrane(m);
+          const machinePhoto = supabaseMachines.find(s => s.name === m)?.imageUrl;
+          return (
+            <div onClick={() => setSelectedMachinePro(m)}
+              className={cn('group bg-white rounded-xl border-2 transition-all cursor-pointer flex flex-col shadow-sm hover:shadow-xl hover:-translate-y-1 overflow-hidden hover:border-blue-400 relative',
+                health.status==='Down'?'border-red-200':health.status==='Idle'?'border-slate-100':health.status==='Warning'?'border-orange-200':'border-slate-200')}>
+              {/* Image */}
+              <div className="h-28 bg-slate-50 relative overflow-hidden border-b border-slate-100 flex items-center justify-center">
+                {machinePhoto
+                  ? <img src={machinePhoto} className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500" alt={m}/>
+                  : <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 gap-1 bg-white/30">
+                      <div className="w-5 h-5 bg-slate-200 rounded animate-pulse"/>
+                      <span className="text-[7px] font-black uppercase tracking-tighter opacity-30">Asset Visual</span>
+                    </div>
+                }
+              </div>
+              {/* Status bar */}
+              <div className={cn('px-4 py-2 flex justify-between items-center border-b',
+                health.status==='Down'?'bg-red-50':health.status==='Idle'?'bg-slate-50':health.status==='Warning'?'bg-orange-50':'bg-slate-50/50')}>
+                <div className="flex items-center gap-2 min-w-0">
+                  {isFk ? <Truck className={cn('w-4 h-4 shrink-0', health.status==='Down'?'text-red-500':health.status==='Idle'?'text-slate-400':'text-orange-600')}/>
+                        : isCr ? <Hammer className={cn('w-4 h-4 shrink-0', health.status==='Down'?'text-red-500':health.status==='Idle'?'text-slate-400':'text-indigo-600')}/>
+                               : <Monitor className={cn('w-4 h-4 shrink-0', health.status==='Down'?'text-red-500':health.status==='Idle'?'text-slate-400':'text-orange-600')}/>}
+                  <h3 className="text-xs font-bold text-slate-800 truncate uppercase tracking-tight">{m}</h3>
+                </div>
+                <div className={cn('w-2.5 h-2.5 rounded-full shrink-0',
+                  health.status==='Down'?'bg-red-500 animate-pulse':health.status==='Idle'?'bg-slate-300':health.status==='Warning'?'bg-orange-500':'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]')}/>
+              </div>
+              {/* Metrics */}
+              <div className="px-4 py-2.5 space-y-1.5">
+                <div className="flex justify-between items-center text-[9px]">
+                  <span className="font-bold text-slate-400 uppercase">Avail: <span className={health.globalAvailability<85?'text-red-600':'text-slate-700'}>{health.globalAvailability}%</span></span>
+                  <span className="font-bold text-slate-400 uppercase">Health: <span className={avgScore<85?'text-orange-600':'text-slate-700'}>{avgScore}%</span></span>
+                </div>
+                <div className="w-full bg-slate-100 h-1 rounded-full overflow-hidden">
+                  <div className={cn('h-full rounded-full transition-all duration-1000', avgScore<50?'bg-red-500':avgScore<85?'bg-orange-500':'bg-emerald-500')} style={{width:`${avgScore}%`}}/>
+                </div>
               </div>
             </div>
+          );
+        };
 
-            {/* Machine detail modal */}
-            <AnimatePresence>
-              {selectedMachinePro && (() => {
-                const recs = maintRecords.filter(r => r.machineName === selectedMachinePro);
-                const monthDtH = recs.filter(r => { const d = new Date(r.date); return d.getFullYear()===msNow.getFullYear()&&d.getMonth()===msNow.getMonth(); }).reduce((s,r)=>s+(r.totalDowntime||0),0);
-                const avail = shiftPlanH > 0 ? Math.max(0, Math.round((1 - monthDtH/shiftPlanH)*100)) : 100;
-                const health = getHealthForMachine(selectedMachinePro);
-                const supaStatus = recs[0] ? ({ Running:'run', Restricted:'warn', Down:'error' }[recs[0].machineStatusAfter] ?? 'idle') : 'idle';
-                const ds = machineStatuses[selectedMachinePro] ?? supaStatus;
-                const statusLabel = { run:'RUNNING MODE', warn:'RESTRICTED', error:'DOWN', idle:'NO PLAN' }[ds] ?? 'NO PLAN';
-                const sColor = dotColor(ds);
+        // ── CategoryHeader ───────────────────────────────────────────────────
+        const CategoryHeader = ({ title, IconC, color, description }: { title:string; IconC:React.FC<{className?:string}>; color:string; description?:string }) => (
+          <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+            <div className="flex items-center gap-3">
+              <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm', color)}>
+                <IconC className="w-5 h-5"/>
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">{title}</h3>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{description||'Factory Operations Asset Group'}</p>
+              </div>
+            </div>
+          </div>
+        );
 
-                const faultGroups: Record<string, typeof recs> = {};
-                for (const r of recs.slice(0, 60)) {
-                  const area = r.faultArea || 'General';
-                  if (!faultGroups[area]) faultGroups[area] = [];
-                  faultGroups[area].push(r);
-                }
+        // ── Machine groups ───────────────────────────────────────────────────
+        const machineNames = allMachines.map(m => m.name);
+        const forkliftMachines = machineNames.filter(isForklift);
+        const craneMachines    = machineNames.filter(isCrane);
+        const prodMachines     = machineNames.filter(m => !isForklift(m) && !isCrane(m));
 
-                return (
-                  <motion.div key="machine-modal" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
-                    className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-                    onClick={()=>setSelectedMachinePro(null)}>
-                    <motion.div initial={{scale:0.95,opacity:0}} animate={{scale:1,opacity:1}} exit={{scale:0.95,opacity:0}}
-                      className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
-                      onClick={e=>e.stopPropagation()}>
-                      {/* Modal header */}
-                      <div className="flex items-center gap-3 p-4 border-b border-slate-100 shrink-0">
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{backgroundColor:sColor+'20'}}>
-                          <Monitor size={18} style={{color:sColor}}/>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h2 className="text-lg font-black text-slate-800">{selectedMachinePro}</h2>
-                            <span className="px-2 py-0.5 rounded-full text-[9px] font-black text-white shrink-0" style={{backgroundColor:sColor}}>{statusLabel}</span>
-                          </div>
-                          <div className="flex gap-4 mt-0.5">
-                            <span className="text-[10px] text-slate-400">AVAIL <span className={cn('font-black', numCls(avail))}>{avail}%</span></span>
-                            <span className="text-[10px] text-slate-400">HEALTH <span className={cn('font-black', numCls(health))}>{health}%</span></span>
-                            <span className="text-[10px] text-slate-400">RECORDS <span className="font-black text-slate-700">{recs.length}</span></span>
-                          </div>
-                        </div>
-                        <button onClick={()=>setSelectedMachinePro(null)} className="text-slate-300 hover:text-slate-500 shrink-0 p-1"><X size={16}/></button>
-                      </div>
-
-                      {/* Modal body */}
-                      <div className="overflow-y-auto flex-1 p-4 space-y-3">
-                        {/* Subsystem risk matrix */}
-                        <div>
-                          <div className="flex items-center gap-2 mb-3">
-                            <div className="w-5 h-5 rounded-md flex items-center justify-center bg-red-100"><Activity size={11} className="text-red-500"/></div>
-                            <div>
-                              <span className="text-[11px] font-black text-slate-700">子系统风险审计矩阵</span>
-                              <span className="ml-2 text-[9px] text-slate-400">基于历史日志数据的动态组件失效预测</span>
-                            </div>
-                          </div>
-                          {Object.keys(faultGroups).length > 0 ? (
-                            <div className="space-y-2">
-                              {Object.entries(faultGroups).map(([area, areaRecs]) => {
-                                const totalDt = areaRecs.reduce((s,r)=>s+(r.totalDowntime||0),0);
-                                const notFixed = areaRecs.filter(r=>r.repairResult==='Not Fixed'||r.repairResult==='Temporary').length;
-                                const score = Math.max(0, Math.round(100 - notFixed*10 - Math.min(totalDt,5)*4));
-                                const sColorScore = score>=90?'#10b981':score>=75?'#f59e0b':'#ef4444';
-                                return (
-                                  <div key={area} className="border border-slate-100 rounded-xl p-3">
-                                    <div className="flex items-center justify-between mb-2.5">
-                                      <span className="text-[10px] font-black text-slate-700 uppercase tracking-wide">{area}</span>
-                                      <span className="text-sm font-black tabular-nums px-2.5 py-0.5 rounded-lg text-white" style={{backgroundColor:sColorScore}}>{score}%</span>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                      {areaRecs.slice(0,4).map((r,i) => {
-                                        const scoreVal = r.repairResult==='Fixed'?100:r.repairResult==='Temporary'?70:r.repairResult==='Not Fixed'?40:85;
-                                        const scoreC = scoreVal>=90?'#10b981':scoreVal>=75?'#f59e0b':'#ef4444';
-                                        return (
-                                          <div key={i} className="bg-slate-50 rounded-lg p-2">
-                                            <div className="flex items-center justify-between mb-1">
-                                              <span className="text-[8px] font-bold text-slate-600 truncate max-w-[100px]">{r.faultReason||r.faultDescription||'Fault'}</span>
-                                              <span className="text-[8px] font-black text-slate-500 shrink-0">{scoreVal}/100</span>
-                                            </div>
-                                            <div className="h-0.5 bg-slate-200 rounded-full overflow-hidden">
-                                              <div className="h-full rounded-full" style={{width:`${scoreVal}%`, backgroundColor:scoreC}}/>
-                                            </div>
-                                            <div className="flex items-center justify-between mt-1">
-                                              <span className="text-[7px] text-slate-400">{r.date}</span>
-                                              <span className="text-[7px] font-bold" style={{color:scoreC}}>{r.repairResult||'—'}</span>
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            <div className="flex flex-col items-center py-8 text-slate-300 gap-2">
-                              <CheckCircle2 size={22}/><span className="text-[9px] font-bold">暂无维修记录 — 同步保养系统后显示</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </motion.div>
-                  </motion.div>
-                );
-              })()}
-            </AnimatePresence>
-
-            {/* Groups */}
-            <div className="divide-y divide-slate-50">
-              {Object.entries(grouped).map(([section, sectionMachines]) => {
-                const cat = MACHINE_CATEGORIES[section] ?? MACHINE_CATEGORIES.other;
-                return (
-                  <div key={section} className="p-4">
-                    {/* Group header */}
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0" style={{backgroundColor:cat.color}}>
-                        {cat.icon}
-                      </div>
-                      <div>
-                        <span className="text-sm font-black text-slate-800">{cat.label}</span>
-                        <span className="ml-1.5 text-[9px] font-bold text-slate-400">{cat.sublabel}</span>
-                        <span className="ml-1.5 text-[8px] font-bold text-slate-300">FACTORY OPERATIONS ASSET GROUP</span>
-                      </div>
-                      <button className="ml-auto flex items-center gap-1 text-[8px] font-bold border border-slate-200 rounded-lg px-2.5 py-1 text-slate-500 hover:bg-slate-50 transition-colors">
-                        <Plus size={10}/> 添加设备
-                      </button>
+        return (
+          <>
+            {/* ── Machine card grid ─────────────────────────────────────────── */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="flex items-center gap-4 px-6 py-4 border-b border-slate-100">
+                <div className="p-3 bg-blue-50 rounded-xl text-blue-600"><Activity size={20}/></div>
+                <div>
+                  <h2 className="text-base font-black text-slate-800 uppercase tracking-tight">Reliability Monitor</h2>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Predictive Engineering & Machine Health Hub</p>
+                </div>
+              </div>
+              <div className="p-6 space-y-10">
+                {prodMachines.length > 0 && (
+                  <div className="space-y-4">
+                    <CategoryHeader title="生产设备 (Production)" IconC={({className}) => <Monitor className={className}/>} color="bg-blue-600"/>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-6">
+                      {prodMachines.map(m => <MachineCardPro key={m} m={m}/>)}
                     </div>
-
-                    {/* Machine cards */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                      {sectionMachines.map(m => {
-                        const recs = maintRecords.filter(r => r.machineName === m.name);
-                        const monthDtH = recs.filter(r => { const d = new Date(r.date); return d.getFullYear()===msNow.getFullYear()&&d.getMonth()===msNow.getMonth(); }).reduce((s,r)=>s+(r.totalDowntime||0),0);
-                        const avail = shiftPlanH > 0 ? Math.max(0, Math.round((1 - monthDtH/shiftPlanH)*100)) : 100;
-                        const health = getHealthForMachine(m.name);
-                        const supaStatus = recs[0] ? ({ Running:'run', Restricted:'warn', Down:'error' }[recs[0].machineStatusAfter] ?? 'idle') : 'idle';
-                        const ds = machineStatuses[m.name] ?? supaStatus;
-                        const dc = dotColor(ds);
-                        const imgUrl = getImageForMachine(m.name);
-
+                  </div>
+                )}
+                {forkliftMachines.length > 0 && (
+                  <div className="space-y-4">
+                    <CategoryHeader title="物流叉车 (Logistics)" IconC={({className}) => <Truck className={className}/>} color="bg-orange-600"/>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-6">
+                      {forkliftMachines.map(m => <MachineCardPro key={m} m={m}/>)}
+                    </div>
+                  </div>
+                )}
+                {craneMachines.length > 0 && (
+                  <div className="space-y-4">
+                    <CategoryHeader title="车间行车 (Cranes)" IconC={({className}) => <Hammer className={className}/>} color="bg-indigo-600"/>
+                    <div className="space-y-6">
+                      {[1,2].map(bay => {
+                        const bayMachines = craneMachines.filter(m => getCraneBay(m) === bay);
+                        if (!bayMachines.length) return null;
                         return (
-                          <div key={m.name} onClick={()=>setSelectedMachinePro(m.name)}
-                            className="rounded-xl border border-slate-100 overflow-hidden cursor-pointer hover:shadow-md hover:border-blue-100 transition-all group bg-white select-none">
-                            {/* Image */}
-                            <div className="relative overflow-hidden bg-slate-100" style={{height:110}}>
-                              <img src={imgUrl} alt={m.name}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                onError={e=>{ (e.target as HTMLImageElement).src='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="220" viewBox="0 0 400 220"><rect fill="%23f1f5f9" width="400" height="220"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%2394a3b8" font-size="14" font-family="sans-serif">'+encodeURIComponent(m.name)+'</text></svg>'; }}
-                              />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"/>
-                              <div className="absolute top-2 right-2 w-3 h-3 rounded-full border-2 border-white shadow" style={{backgroundColor:dc}}/>
-                            </div>
-                            {/* Info */}
-                            <div className="p-2.5">
-                              <div className="flex items-center gap-1 mb-2">
-                                <Monitor size={9} className="text-slate-400 shrink-0"/>
-                                <span className="text-[10px] font-black text-slate-800 truncate">{m.name}</span>
-                              </div>
-                              <div className="space-y-1.5">
-                                {/* AVAIL */}
-                                <div>
-                                  <div className="flex justify-between items-baseline mb-0.5">
-                                    <span className="text-[7px] font-bold text-slate-400">AVAIL</span>
-                                    <span className={cn('text-[9px] font-black tabular-nums', numCls(avail))}>{avail}%</span>
-                                  </div>
-                                  <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
-                                    <div className={cn('h-full rounded-full', barCls(avail))} style={{width:`${avail}%`}}/>
-                                  </div>
-                                </div>
-                                {/* HEALTH */}
-                                <div>
-                                  <div className="flex justify-between items-baseline mb-0.5">
-                                    <span className="text-[7px] font-bold text-slate-400">HEALTH</span>
-                                    <span className={cn('text-[9px] font-black tabular-nums', numCls(health))}>{health}%</span>
-                                  </div>
-                                  <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
-                                    <div className={cn('h-full rounded-full', barCls(health))} style={{width:`${health}%`}}/>
-                                  </div>
-                                </div>
-                              </div>
+                          <div key={bay} className="bg-slate-50/50 p-6 rounded-xl border border-slate-100">
+                            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                              <div className="w-1.5 h-3 bg-indigo-400 rounded-full"/> Bay {bay} Section
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-6">
+                              {bayMachines.map(m => <MachineCardPro key={m} m={m}/>)}
                             </div>
                           </div>
                         );
                       })}
                     </div>
                   </div>
-                );
-              })}
+                )}
+              </div>
             </div>
-          </div>
+
+            {/* ── Machine detail modal ──────────────────────────────────────── */}
+            <AnimatePresence>
+              {selectedMachinePro && (() => {
+                const h = calculateHealth(selectedMachinePro);
+                const isFk = isForklift(selectedMachinePro); const isCr = isCrane(selectedMachinePro);
+                const avgScore = h.systems.length > 0 ? Math.round(h.systems.reduce((a,b)=>a+b.score,0)/h.systems.length) : 100;
+                return (
+                  <motion.div key="pro-modal" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 overflow-y-auto"
+                    onClick={() => setSelectedMachinePro(null)}>
+                    <motion.div initial={{scale:0.95,opacity:0}} animate={{scale:1,opacity:1}} exit={{scale:0.95,opacity:0}}
+                      className="bg-white rounded-xl shadow-2xl w-full max-w-6xl my-auto border border-slate-200 overflow-hidden flex flex-col max-h-[95vh]"
+                      onClick={e => e.stopPropagation()}>
+
+                      {/* Modal header */}
+                      <div className="bg-white border-b px-8 py-4 flex justify-between items-start z-10 sticky top-0">
+                        <div className="flex items-center gap-5">
+                          <div className={cn('w-14 h-14 rounded-xl flex items-center justify-center text-white shadow-lg', isFk?'bg-orange-600':isCr?'bg-indigo-600':'bg-blue-600')}>
+                            {isFk ? <Truck className="w-8 h-8"/> : isCr ? <Hammer className="w-8 h-8"/> : <Activity className="w-8 h-8"/>}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-3 mb-1">
+                              <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tight leading-none">{selectedMachinePro}</h2>
+                              <div className={cn('px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border shadow-sm',
+                                h.status==='Down'?'bg-red-50 text-red-600 border-red-200':h.status==='Idle'?'bg-slate-50 text-slate-400 border-slate-200':'bg-emerald-50 text-emerald-600 border-emerald-200')}>
+                                {h.status} Mode
+                              </div>
+                            </div>
+                            <div className="flex gap-4 text-[10px] text-slate-400 font-bold">
+                              <span>Global Availability: <span className="text-slate-700 font-black">{h.globalAvailability}%</span></span>
+                              <span>Health Score: <span className="text-slate-700 font-black">{avgScore}%</span></span>
+                              <span>Downtime: <span className="text-red-600 font-black">{h.totalDowntimeHours}h</span></span>
+                            </div>
+                          </div>
+                        </div>
+                        <button onClick={() => setSelectedMachinePro(null)}
+                          className="p-2.5 bg-slate-100 hover:bg-slate-200 rounded-full transition-all hover:rotate-90 shadow-inner">
+                          <X className="w-7 h-7 text-slate-400"/>
+                        </button>
+                      </div>
+
+                      {/* Modal body */}
+                      <div className="flex-1 overflow-y-auto p-4 lg:p-8 space-y-10 bg-slate-50/50">
+
+                        {/* KPI Row */}
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                          <div className="bg-blue-600 p-6 rounded-lg text-white shadow-xl relative overflow-hidden">
+                            <div className="text-white/60 text-[10px] font-black uppercase mb-1">Global Availability</div>
+                            <div className="text-3xl font-black">{h.globalAvailability}%</div>
+                            <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full"/>
+                          </div>
+                          <div className="bg-white p-6 rounded-lg border-2 border-slate-100 shadow-sm flex flex-col justify-center">
+                            <div className="text-slate-400 text-[10px] font-black uppercase mb-1">Scheduled Op Hours</div>
+                            <div className="text-3xl font-black text-slate-800">{h.totalScheduledHours} <span className="text-xs font-bold opacity-30">hrs</span></div>
+                          </div>
+                          <div className="bg-white p-6 rounded-lg border-2 border-slate-100 shadow-sm flex flex-col justify-center">
+                            <div className="text-slate-400 text-[10px] font-black uppercase mb-1">Idle / Planned Off</div>
+                            <div className="text-3xl font-black text-amber-600">{h.totalPlannedOffHours} <span className="text-xs font-bold opacity-30">hrs</span></div>
+                          </div>
+                          <div className="bg-white p-6 rounded-lg border-2 border-slate-100 shadow-sm flex flex-col justify-center border-red-200/50">
+                            <div className="text-slate-400 text-[10px] font-black uppercase mb-1">Total Downtime</div>
+                            <div className="text-3xl font-black text-red-600">{h.totalDowntimeHours} <span className="text-xs font-bold opacity-30">hrs</span></div>
+                          </div>
+                        </div>
+
+                        {/* Availability chart */}
+                        {h.allTimeHistory.length > 0 && (
+                          <div className="bg-white p-8 rounded-xl border-2 border-slate-100 shadow-sm">
+                            <div className="flex justify-between items-center mb-6">
+                              <h3 className="font-black text-slate-800 text-sm uppercase flex items-center gap-2"><TrendingUp className="w-4 h-4 text-blue-500"/> Availability Performance History</h3>
+                            </div>
+                            <div className="h-48 w-full">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={h.allTimeHistory} margin={{top:10,right:10,left:-20,bottom:0}}>
+                                  <defs>
+                                    <linearGradient id="colorAvailPro" x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                                    </linearGradient>
+                                  </defs>
+                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
+                                  <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fontSize:9, fill:'#94a3b8'}}/>
+                                  <YAxis domain={[0,100]} axisLine={false} tickLine={false} tick={{fontSize:9, fontWeight:'bold', fill:'#94a3b8'}}/>
+                                  <Tooltip contentStyle={{borderRadius:'15px', border:'none', boxShadow:'0 10px 15px -3px rgba(0,0,0,0.1)', fontSize:'10px'}}/>
+                                  <Area type="monotone" dataKey="availability" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorAvailPro)" dot={{r:4, strokeWidth:2, fill:'#fff'}}/>
+                                </AreaChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Subsystem Risk Matrix */}
+                        <div className="space-y-6">
+                          <div className="flex justify-between items-end px-2">
+                            <div>
+                              <h3 className="text-2xl font-black text-slate-800 uppercase flex items-center gap-3 tracking-tight">
+                                <Activity className="w-8 h-8 text-red-500"/>
+                                子系统风险审计矩阵
+                                <button onClick={() => setIsMatrixExpanded(!isMatrixExpanded)}
+                                  className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 transition-all ml-2">
+                                  {isMatrixExpanded ? <ChevronUp className="w-5 h-5"/> : <ChevronDown className="w-5 h-5"/>}
+                                </button>
+                              </h3>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">基于历史日志数据的动态组件失效预测</p>
+                            </div>
+                          </div>
+
+                          {h.systems.length === 0 && (
+                            <div className="bg-white rounded-xl border-2 border-slate-100 p-8 text-center text-slate-300">
+                              <p className="text-sm font-black uppercase tracking-widest">未配置子系统矩阵</p>
+                              <p className="text-[10px] mt-1">在 Pro-Maintenance 中配置 Health Matrix Engine</p>
+                            </div>
+                          )}
+
+                          {isMatrixExpanded && h.systems.length > 0 && (
+                            <div className="grid grid-cols-1 gap-8 pb-4">
+                              {h.systems.map(sys => (
+                                <div key={sys.name} className="bg-white rounded-xl border-2 border-slate-100 overflow-hidden shadow-md hover:border-blue-200 transition-all">
+                                  <div className="px-10 py-4 bg-slate-50/80 border-b border-slate-100 flex justify-between items-center">
+                                    <div className="flex items-center gap-3">
+                                      <div className={cn('w-3 h-3 rounded-full', sys.status==='Critical'?'bg-red-500 animate-pulse':sys.status==='Warning'?'bg-orange-400':'bg-emerald-500')}/>
+                                      <h4 className="font-black text-slate-800 text-sm uppercase tracking-widest">{sys.name}</h4>
+                                    </div>
+                                    <div className={cn('text-xl font-black px-6 py-1 rounded-xl border-2 shadow-sm',
+                                      sys.score<50?'bg-red-50 text-red-600':sys.score<85?'bg-orange-50 text-orange-600':'bg-emerald-50 text-emerald-600')}>
+                                      {sys.score}% <span className="text-[10px] opacity-40 uppercase tracking-tighter">健康度</span>
+                                    </div>
+                                  </div>
+                                  <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-8 bg-white">
+                                    {sys.components.map(comp => (
+                                      <div key={comp.name} className="flex flex-col gap-3 group/comp relative pl-5 border-l-4 border-slate-100 hover:border-blue-400 transition-all">
+                                        <div className="flex justify-between items-center">
+                                          <span className="text-xs font-black text-slate-800 uppercase tracking-tight group-hover/comp:text-blue-600 transition-colors">{comp.name}</span>
+                                          <span className={cn('text-[10px] font-black', comp.score<85?'text-orange-500':'text-slate-400')}>{comp.score}/100</span>
+                                        </div>
+                                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                          <div className={cn('h-full rounded-full transition-all duration-1000', comp.score<50?'bg-red-600':comp.score<85?'bg-orange-500':'bg-emerald-500')} style={{width:`${comp.score}%`}}/>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5 min-h-[22px]">
+                                          {comp.deductions.map((d,i) => (
+                                            <div key={i} className="flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] font-black bg-red-50 text-red-600 border-red-100">
+                                              <span>{d.type}</span><span className="opacity-60">-{d.val}</span>
+                                            </div>
+                                          ))}
+                                          {comp.deductions.length === 0 && <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100">优化完成</span>}
+                                        </div>
+                                        <div className="flex justify-between items-center pt-3 mt-1 border-t border-slate-50">
+                                          <span className="text-[9px] font-black uppercase text-blue-600 flex items-center gap-1.5">
+                                            <History size={11}/> {comp.issueCount} 日志
+                                          </span>
+                                          <span className={cn('text-[9px] font-black uppercase px-2 py-0.5 rounded', comp.score<70?'bg-red-50 text-red-500':'bg-slate-50 text-slate-400')}>{comp.riskLevel}</span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Planned off + Downtime tables */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-6">
+                          <div className="space-y-4">
+                            <h3 className="text-sm font-black text-slate-800 uppercase flex items-center gap-3 tracking-widest px-2">
+                              <Hourglass className="w-5 h-5 text-amber-500"/> IDLE / PLANNED OFF (计划停机明细)
+                            </h3>
+                            <div className="bg-white rounded-lg border-2 border-slate-100 overflow-hidden shadow-sm">
+                              <table className="w-full text-[10px] text-left border-collapse">
+                                <thead className="bg-slate-50 text-slate-400 font-black uppercase tracking-tighter border-b">
+                                  <tr><th className="px-4 py-3">日期</th><th className="px-4 py-3">班次</th><th className="px-4 py-3">原因</th><th className="px-4 py-3 text-right">时长(H)</th></tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                  {h.plannedRecords.slice(0,15).map(r => (
+                                    <tr key={r.id} className="hover:bg-slate-50">
+                                      <td className="px-4 py-3 font-bold text-slate-600">{r.date}</td>
+                                      <td className="px-4 py-3 font-bold text-slate-400 uppercase">{r.shift}</td>
+                                      <td className="px-4 py-3 text-slate-500 italic truncate max-w-[150px]">{r.faultReason}</td>
+                                      <td className="px-4 py-3 text-right font-black text-amber-600">{r.repairTime}</td>
+                                    </tr>
+                                  ))}
+                                  {h.plannedRecords.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-300 font-bold uppercase tracking-widest italic">无计划停机记录</td></tr>}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                          <div className="space-y-4">
+                            <h3 className="text-sm font-black text-slate-800 uppercase flex items-center gap-3 tracking-widest px-2">
+                              <AlertTriangle className="w-5 h-5 text-red-500"/> TOTAL DOWNTIME (故障停机明细)
+                            </h3>
+                            <div className="bg-white rounded-lg border-2 border-slate-100 overflow-hidden shadow-sm">
+                              <table className="w-full text-[10px] text-left border-collapse">
+                                <thead className="bg-slate-50 text-slate-400 font-black uppercase tracking-tighter border-b">
+                                  <tr><th className="px-4 py-3">日期</th><th className="px-4 py-3">区域</th><th className="px-4 py-3">描述</th><th className="px-4 py-3 text-right">损失(H)</th></tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                  {h.downtimeRecords.slice(0,15).map(r => (
+                                    <tr key={r.id} className="hover:bg-slate-50 cursor-pointer">
+                                      <td className="px-4 py-3 font-bold text-slate-600">{r.date}</td>
+                                      <td className="px-4 py-3 font-bold text-slate-500 uppercase">{r.faultArea}</td>
+                                      <td className="px-4 py-3 text-slate-500 truncate max-w-[150px]">{r.faultDescription}</td>
+                                      <td className="px-4 py-3 text-right font-black text-red-600">{r.totalDowntime}</td>
+                                    </tr>
+                                  ))}
+                                  {h.downtimeRecords.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-300 font-bold uppercase tracking-widest italic">未发现故障记录</td></tr>}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                );
+              })()}
+            </AnimatePresence>
+          </>
         );
       })()}
 
-      {/* ══ Maintenance Logs ═══════════════════════════════════════════ */}
+
+            {/* ══ Maintenance Logs ═══════════════════════════════════════════ */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100 flex-wrap">
           <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Maintenance Logs — 维修记录</span>
