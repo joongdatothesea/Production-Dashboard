@@ -6803,43 +6803,6 @@ const MachineSection: React.FC<SectionProps> = ({ color }) => {
               </div>
             </div>
 
-            {/* ── Maintenance Logs ── */}
-            <div className="border-t border-slate-200">
-              <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 flex-wrap">
-                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Maintenance Logs — 维修记录</span>
-                <div className="flex gap-1 flex-wrap ml-1">
-                  {(["all",...allMachines.map(m=>m.name)] as string[]).map(name=>(
-                    <button key={name} onClick={()=>setWoMachine(name)} className={cn("text-[8px] px-2 py-0.5 rounded-full font-bold transition-colors", woMachine===name?"bg-slate-800 text-white":"bg-slate-100 text-slate-500 hover:bg-slate-200")}>{name==="all"?"全部":name}</button>
-                  ))}
-                </div>
-                <span className="text-[8px] text-slate-300 ml-auto">{maintRecords.filter(r=>woMachine==="all"||r.machineName===woMachine).length} 条</span>
-              </div>
-              {maintRecords.length > 0 ? (
-                <div className="overflow-x-auto" style={{maxHeight:300,overflowY:"auto"}}>
-                  <table className="w-full text-[9px]">
-                    <thead style={{position:"sticky",top:0,zIndex:1}}><tr className="border-b border-slate-100 bg-slate-50">{["日期","班次","机器","故障区域","类型","难度","停机(h)","维修结果","机器状态","技术员"].map(h=><th key={h} className="text-left px-3 py-2 font-bold text-slate-400 whitespace-nowrap">{h}</th>)}</tr></thead>
-                    <tbody>{maintRecords.filter(r=>woMachine==="all"||r.machineName===woMachine).slice(0,100).map((r,i)=>(
-                      <tr key={r.id} className={cn("border-t border-slate-50 hover:bg-slate-50/60",i%2===1?"bg-slate-50/20":"")}>
-                        <td className="px-3 py-1.5 font-bold text-slate-700 whitespace-nowrap">{r.date}</td>
-                        <td className="px-3 py-1.5"><span className={cn("px-1.5 py-0.5 rounded-full text-[7px] font-black",r.shift==="AM"?"bg-blue-100 text-blue-700":"bg-amber-100 text-amber-700")}>{r.shift||"—"}</span></td>
-                        <td className="px-3 py-1.5 font-black text-slate-800 whitespace-nowrap">{r.machineName}</td>
-                        <td className="px-3 py-1.5 text-slate-600 max-w-[120px] truncate">{r.faultArea||"—"}</td>
-                        <td className="px-3 py-1.5 text-slate-500 whitespace-nowrap">{r.maintenanceType||"—"}</td>
-                        <td className="px-3 py-1.5">{r.difficulty?<span className={cn("font-black",r.difficulty<=2?"text-emerald-600":r.difficulty<=3?"text-amber-500":"text-red-500")}>L{r.difficulty}</span>:"—"}</td>
-                        <td className={cn("px-3 py-1.5 font-black tabular-nums",r.totalDowntime>0?"text-red-500":"text-slate-400")}>{r.totalDowntime>0?r.totalDowntime.toFixed(1):"—"}</td>
-                        <td className="px-3 py-1.5">{r.repairResult?<span className={cn("px-1.5 py-0.5 rounded text-[7px] font-bold",({Fixed:"bg-emerald-100 text-emerald-700",Temporary:"bg-amber-100 text-amber-700","Not Fixed":"bg-red-100 text-red-600",Observation:"bg-blue-100 text-blue-700"} as Record<string,string>)[r.repairResult]??"bg-slate-100 text-slate-500")}>{r.repairResult}</span>:"—"}</td>
-                        <td className="px-3 py-1.5">{r.machineStatusAfter?<span className={cn("px-1.5 py-0.5 rounded text-[7px] font-bold",r.machineStatusAfter==="Running"?"bg-emerald-100 text-emerald-700":r.machineStatusAfter==="Restricted"?"bg-amber-100 text-amber-700":"bg-red-100 text-red-600")}>{r.machineStatusAfter}</span>:"—"}</td>
-                        <td className="px-3 py-1.5 text-slate-500 whitespace-nowrap">{r.technician||"—"}</td>
-                      </tr>
-                    ))}</tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-8 text-slate-300 gap-2 bg-white">
-                  <History size={20}/><span className="text-[9px] font-bold">暂无记录 — 点击「同步保养系统」加载</span>
-                </div>
-              )}
-            </div>
           </div>
         );
       })()}
