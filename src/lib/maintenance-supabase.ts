@@ -21,14 +21,17 @@ export interface MaintRecord {
   faultReason: string;
   faultDescription: string;
   faultPhoto?: string;
-  repairResult: string;
-  machineStatusAfter: string;
-  totalDowntime: number;     // minutes
+  repairResult: string;         // Fixed / Temporary / Not Fixed / Observation
+  machineStatusAfter: string;   // Running / Restricted / Down
+  totalDowntime: number;        // hours
   repairTime: number;
+  repairCost: number;
   technician: string;
   isProductionDelayed: boolean;
   isRecurring: boolean;
   maintenanceType?: string;
+  jobStatus?: string;           // Pending / In Progress / Completed
+  difficulty?: number;          // 1-5
   remarks?: string;
 }
 
@@ -47,6 +50,8 @@ export interface MachineInfo {
   name: string;
   model?: string;
   serialNumber?: string;
+  section?: string;   // e.g. 'production','logistics','crane','other'
+  imageUrl?: string;
 }
 
 // ─── Fetch functions ───────────────────────────────────────────────────────
@@ -56,7 +61,7 @@ export const fetchMaintenanceRecords = async (fromDate?: string): Promise<MaintR
   const client = getClient();
   let query = client
     .from('maintenance_records')
-    .select('id,date,machine_name,shift,fault_area,fault_reason,fault_description,fault_photo,repair_result,machine_status_after,total_downtime,repair_time,technician,is_production_delayed,is_recurring,maintenance_type,remarks')
+    .select('id,date,machine_name,shift,fault_area,fault_reason,fault_description,fault_photo,repair_result,machine_status_after,total_downtime,repair_time,repair_cost,technician,is_production_delayed,is_recurring,maintenance_type,job_status,difficulty,remarks')
     .order('date', { ascending: false })
     .limit(500);
 
@@ -79,9 +84,12 @@ export const fetchMaintenanceRecords = async (fromDate?: string): Promise<MaintR
     totalDowntime: r.total_downtime ?? 0,
     repairTime: r.repair_time ?? 0,
     technician: r.technician,
+    repairCost: r.repair_cost ?? 0,
     isProductionDelayed: r.is_production_delayed ?? false,
     isRecurring: r.is_recurring ?? false,
     maintenanceType: r.maintenance_type,
+    jobStatus: r.job_status,
+    difficulty: r.difficulty,
     remarks: r.remarks,
   }));
 };

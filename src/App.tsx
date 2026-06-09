@@ -1490,7 +1490,7 @@ const SafetySection: React.FC<SafetySectionProps> = ({ color, accidentFreeDays, 
         );
       })()}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-6 flex-1 min-h-0">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(220px,320px)_1fr] gap-6 flex-1 min-h-0">
 
         {/* Safety Wall */}
         <SafetyWall />
@@ -1648,7 +1648,7 @@ const SafetySection: React.FC<SafetySectionProps> = ({ color, accidentFreeDays, 
           </div>
 
           <div>
-            <h1 className="font-black leading-tight mb-2" style={{ fontSize: 'clamp(1.5rem, 2.8vw, 5rem)' }}>
+            <h1 className="font-black leading-tight mb-2" style={{ fontSize: 'clamp(1rem, 1.8vw, 2.2rem)' }}>
               WE HAVE WORKED
               <br />
               <motion.span
@@ -1656,7 +1656,7 @@ const SafetySection: React.FC<SafetySectionProps> = ({ color, accidentFreeDays, 
                 initial={{ scale: 1.2, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 className="text-emerald-300 block"
-                style={{ fontSize: 'clamp(5rem, 13vw, 22rem)', lineHeight: 1 }}
+                style={{ fontSize: 'clamp(4rem, 7vw, 10rem)', lineHeight: 1 }}
               >
                 {accidentFreeDays}
               </motion.span>
@@ -1689,7 +1689,7 @@ const SafetySection: React.FC<SafetySectionProps> = ({ color, accidentFreeDays, 
               </div>
             ) : (
               <div className="flex items-baseline gap-3">
-                <span className="font-black text-white leading-none" style={{ fontSize: 'clamp(2rem, 4.5vw, 7rem)', lineHeight: 1 }}>
+                <span className="font-black text-white leading-none" style={{ fontSize: 'clamp(2rem, 3vw, 4.5rem)', lineHeight: 1 }}>
                   {Math.max(bestRecord, accidentFreeDays)}
                 </span>
                 <span className="font-bold text-emerald-300" style={{ fontSize: 'clamp(0.75rem, 1.2vw, 2rem)' }}>days</span>
