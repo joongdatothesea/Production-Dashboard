@@ -6165,7 +6165,19 @@ const MachineSection: React.FC<SectionProps> = ({ color }) => {
   const [isMatrixExpanded, setIsMatrixExpanded] = useState(true);
   const [proPreviewImage, setProPreviewImage] = useState<string | null>(null);
   const [machineProConfig, setMachineProConfig] = useState<Record<string, Record<string, string[]>>>(() => {
-    try { return JSON.parse(localStorage.getItem('systemConfig') || '{}'); } catch { return {}; }
+    try {
+      const stored = JSON.parse(localStorage.getItem('systemConfig') || '{}');
+      if (!stored.DEFAULT_TEMPLATE) {
+        stored.DEFAULT_TEMPLATE = {
+          '液压系统': ['主泵', '油缸', '控制阀', '密封件'],
+          '电气系统': ['主电机', '变频器', '传感器', 'PLC控制器'],
+          '机械传动': ['主轴', '齿轮箱', '联轴器', '轴承'],
+          '润滑系统': ['润滑泵', '油管', '滤芯'],
+          '安全系统': ['急停按钮', '限位开关', '防护装置'],
+        };
+      }
+      return stored;
+    } catch { return {}; }
   });
   const [quickDt, setQuickDt]         = useState<{ machine:string; dur:number; type:string; shift:'AM'|'PM'; reason:string } | null>(null);
 
@@ -7012,22 +7024,25 @@ const MachineSection: React.FC<SectionProps> = ({ color }) => {
         );
 
         // ── Machine groups ───────────────────────────────────────────────────
+        const hardcodedProdNames = new Set(['FT-1','FT-2','MST','PL22','SL28','SL32','SL300','Robo','Threading']);
+        const getSection = (name: string) => supabaseMachines.find(s => s.name === name)?.section?.toLowerCase() || '';
+        const isSupport = (name: string) => {
+          const sec = getSection(name);
+          if (sec === 'other' || sec === 'support') return true;
+          const n = name.toLowerCase();
+          return !hardcodedProdNames.has(name) && !isForklift(name) && !isCrane(name) &&
+            (n.includes('compressor') || n.includes('printer') || n.includes('空压') || n.includes('打印'));
+        };
         const machineNames = allMachines.map(m => m.name);
         const forkliftMachines = machineNames.filter(isForklift);
         const craneMachines    = machineNames.filter(isCrane);
-        const prodMachines     = machineNames.filter(m => !isForklift(m) && !isCrane(m));
+        const supportMachines  = machineNames.filter(isSupport);
+        const prodMachines     = machineNames.filter(m => !isForklift(m) && !isCrane(m) && !isSupport(m));
 
         return (
           <>
             {/* ── Machine card grid ─────────────────────────────────────────── */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden shrink-0">
-              <div className="flex items-center gap-4 px-6 py-4 border-b border-slate-100">
-                <div className="p-3 bg-blue-50 rounded-xl text-blue-600"><Activity size={20}/></div>
-                <div>
-                  <h2 className="text-base font-black text-slate-800 uppercase tracking-tight">Reliability Monitor</h2>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Predictive Engineering & Machine Health Hub</p>
-                </div>
-              </div>
               <div className="p-6 space-y-10">
                 {prodMachines.length > 0 && (
                   <div className="space-y-4">
@@ -7042,6 +7057,14 @@ const MachineSection: React.FC<SectionProps> = ({ color }) => {
                     <CategoryHeader title="物流叉车 (Logistics)" IconC={({className}) => <Truck className={className}/>} color="bg-orange-600"/>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-6">
                       {forkliftMachines.map(m => <MachineCardPro key={m} m={m}/>)}
+                    </div>
+                  </div>
+                )}
+                {supportMachines.length > 0 && (
+                  <div className="space-y-4">
+                    <CategoryHeader title="支持设备 (Support)" IconC={({className}) => <Activity className={className}/>} color="bg-slate-500" description="Air Compressors, Printers & Support Equipment"/>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-6">
+                      {supportMachines.map(m => <MachineCardPro key={m} m={m}/>)}
                     </div>
                   </div>
                 )}
