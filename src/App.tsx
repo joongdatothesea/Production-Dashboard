@@ -6145,901 +6145,802 @@ interface MachineDowntimeEntry {
 }
 
 const MachineSection: React.FC<SectionProps> = ({ color }) => {
-  // ── Types ──────────────────────────────────────────────────────────────
-  interface MsMachine { name: string; category: 'PRODUCTION'|'FORKLIFT'|'CRANE'|'OTHER'; section?: string; }
-  interface MsHealth {
-    status: 'Running'|'Restricted'|'Down';
-    globalAvailability: number;
-    totalCalendarHours: number;
-    totalScheduledHours: number;
-    totalPlannedOffHours: number;
-    totalDowntimeHours: number;
-    healthScore: number;
-    history: { label: string; availability: number }[];
-    lastRecord?: { date: string; repairResult?: string; faultArea?: string; technician?: string; };
-  }
+  const machines = [
+    { name: 'FT-1',  oee: 92, status: 'run'   },
+    { name: 'FT-2',  oee: 88, status: 'run'   },
+    { name: 'MST',   oee: 74, status: 'warn'  },
+    { name: 'PL22',  oee: 0,  status: 'error' },
+    { name: 'SL28',  oee: 0,  status: 'idle'  },
+    { name: 'SL32',  oee: 81, status: 'run'   },
+    { name: 'SL300', oee: 96, status: 'run'   },
+    { name: 'Robo',  oee: 98, status: 'run'   },
+  ];
 
-  // ── IDB-persisted state ────────────────────────────────────────────────
-  const [msList,    setMsList]    = useState<MsMachine[]>([]);
-  const [msImages,  setMsImages]  = useState<Record<string,string>>({});
-  const [msMeta,    setMsMeta]    = useState<Record<string,{serialNumber?:string;model?:string}>>({});
+  // Machine status overrides (persisted)
+  const [machineStatuses, setMachineStatuses] = useState<Record<string,string>>(() => {
+    try { return JSON.parse(localStorage.getItem('machineStatuses') || '{}'); } catch { return {}; }
+  });
+  const [statusModal, setStatusModal] = useState<string | null>(null);
+  const [quickDt, setQuickDt]         = useState<{ machine:string; dur:number; type:string; shift:'AM'|'PM'; reason:string } | null>(null);
 
-  // ── Supabase sync state ────────────────────────────────────────────────
-  const [maintRecords,    setMaintRecords]    = useState<import('./lib/maintenance-supabase').MaintRecord[]>([]);
-  const [syncStatus,      setSyncStatus]      = useState<'idle'|'syncing'|'ok'|'err'>('idle');
-  const [lastSync,        setLastSync]        = useState('');
+  // ── Work Order state (4.3.3) ──────────────────────────────────────────────
+  const [workOrders,    setWorkOrders]    = useState<WorkOrder[]>([]);
+  const [woMachine,     setWoMachine]     = useState<string>('all');
+  const [woModal,       setWoModal]       = useState(false);
+  const [woLightbox,    setWoLightbox]    = useState<string|null>(null);
+  const [woEdit,        setWoEdit]        = useState<WorkOrder|null>(null);
+  // form state
+  const [wfMachine,     setWfMachine]     = useState('FT-1');
+  const [wfDesc,        setWfDesc]        = useState('');
+  const [wfStatus,      setWfStatus]      = useState<WorkOrder['status']>('pending');
+  const [wfFixed,       setWfFixed]       = useState(false);
+  const [wfWorking,     setWfWorking]     = useState(true);
+  const [wfPlanned,     setWfPlanned]     = useState(false);
+  const [wfFitter,      setWfFitter]      = useState('');
+  const [wfDate,        setWfDate]        = useState(new Date().toISOString().slice(0,10));
+  const [wfPriority,    setWfPriority]    = useState<WorkOrder['priority']>('medium');
+  const [wfHours,       setWfHours]       = useState('');
+  const [wfActualH,     setWfActualH]     = useState('');
+  const [wfNotes,       setWfNotes]       = useState('');
+  const [wfPhotos,      setWfPhotos]      = useState<string[]>([]);
 
-  // ── Work Order state ───────────────────────────────────────────────────
-  const [workOrders,  setWorkOrders]  = useState<WorkOrder[]>([]);
-  const [woMachine,   setWoMachine]   = useState<string>('all');
-  const [woModal,     setWoModal]     = useState(false);
-  const [woLightbox,  setWoLightbox]  = useState<string|null>(null);
-  const [woEdit,      setWoEdit]      = useState<WorkOrder|null>(null);
-  const [wfMachine,   setWfMachine]   = useState('');
-  const [wfDesc,      setWfDesc]      = useState('');
-  const [wfStatus,    setWfStatus]    = useState<WorkOrder['status']>('pending');
-  const [wfFixed,     setWfFixed]     = useState(false);
-  const [wfWorking,   setWfWorking]   = useState(true);
-  const [wfPlanned,   setWfPlanned]   = useState(false);
-  const [wfFitter,    setWfFitter]    = useState('');
-  const [wfDate,      setWfDate]      = useState(new Date().toISOString().slice(0,10));
-  const [wfPriority,  setWfPriority]  = useState<WorkOrder['priority']>('medium');
-  const [wfHours,     setWfHours]     = useState('');
-  const [wfActualH,   setWfActualH]   = useState('');
-  const [wfNotes,     setWfNotes]     = useState('');
-  const [wfPhotos,    setWfPhotos]    = useState<string[]>([]);
-
-  // ── UI state ───────────────────────────────────────────────────────────
-  const [activeTab,        setActiveTab]        = useState<'SUMMARY'|'PRODUCTION'|'FORKLIFTS'|'CRANES'|'OTHERS'>('SUMMARY');
-  const [selectedMachine,  setSelectedMachine]  = useState<string|null>(null);
-  const [previewImage,     setPreviewImage]      = useState<string|null>(null);
-  const [isAddModalOpen,   setIsAddModalOpen]    = useState(false);
-  const [isEditModalOpen,  setIsEditModalOpen]   = useState(false);
-  const [isPlanModalOpen,  setIsPlanModalOpen]   = useState(false);
-  const [calcStartDate]    = useState('2025-01-01');
-
-  const [addForm,  setAddForm]  = useState<{name:string;category:MsMachine['category'];section:string;isNewSection:boolean}>({name:'',category:'PRODUCTION',section:'',isNewSection:false});
-  const [editForm, setEditForm] = useState<{oldName:string;name:string;category:MsMachine['category'];section:string;isNewSection:boolean}>({oldName:'',name:'',category:'PRODUCTION',section:'',isNewSection:false});
-
-  // ── Load from IDB ──────────────────────────────────────────────────────
   useEffect(() => {
-    idbGet<MsMachine[]>('msMachineList').then(d => { if (d?.length) setMsList(d); });
-    idbGet<Record<string,string>>('msMachineImages').then(d => { if (d) setMsImages(d); });
-    idbGet<Record<string,{serialNumber?:string;model?:string}>>('msMachineMeta').then(d => { if (d) setMsMeta(d); });
     idbGet<WorkOrder[]>('machineWorkOrders').then(d => { if (d?.length) setWorkOrders(d); });
   }, []);
 
-  // ── Supabase sync ──────────────────────────────────────────────────────
+  const saveWorkOrders = (wo: WorkOrder[]) => { setWorkOrders(wo); idbSet('machineWorkOrders', wo); };
+
+  const resizeWoImg = (file: File): Promise<string> => new Promise(resolve => {
+    const img = new Image(); const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 900; let [w,h] = [img.width, img.height];
+      if (w > MAX) { h = Math.round(h*MAX/w); w = MAX; }
+      const c = document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d')!.drawImage(img,0,0,w,h); URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg', 0.75));
+    }; img.src = url;
+  });
+
+  const openAddWo = (machine?: string) => {
+    setWoEdit(null);
+    setWfMachine(machine || machines[0].name);
+    setWfDesc(''); setWfStatus('pending'); setWfFixed(false); setWfWorking(true);
+    setWfPlanned(false); setWfFitter(''); setWfDate(new Date().toISOString().slice(0,10));
+    setWfPriority('medium'); setWfHours(''); setWfActualH(''); setWfNotes(''); setWfPhotos([]);
+    setWoModal(true);
+  };
+
+  const openEditWo = (wo: WorkOrder) => {
+    setWoEdit(wo);
+    setWfMachine(wo.machine); setWfDesc(wo.description); setWfStatus(wo.status);
+    setWfFixed(wo.isMachineFixed); setWfWorking(wo.isMachineWorking); setWfPlanned(wo.isPlannedDowntime);
+    setWfFitter(wo.fitter); setWfDate(wo.date); setWfPriority(wo.priority);
+    setWfHours(wo.estimatedHours ? String(wo.estimatedHours) : '');
+    setWfActualH(wo.actualHours ? String(wo.actualHours) : '');
+    setWfNotes(wo.notes ?? ''); setWfPhotos([...wo.photos]);
+    setWoModal(true);
+  };
+
+  const saveWoForm = () => {
+    if (!wfDesc.trim()) return;
+    const wo: WorkOrder = {
+      id: woEdit?.id ?? `wo-${Date.now()}`,
+      machine: wfMachine, description: wfDesc, status: wfStatus,
+      isMachineFixed: wfFixed, isMachineWorking: wfWorking, isPlannedDowntime: wfPlanned,
+      fitter: wfFitter, date: wfDate,
+      completedDate: wfStatus === 'completed' ? (woEdit?.completedDate || new Date().toISOString().slice(0,10)) : undefined,
+      photos: wfPhotos, priority: wfPriority,
+      estimatedHours: wfHours ? parseFloat(wfHours) : undefined,
+      actualHours: wfActualH ? parseFloat(wfActualH) : undefined,
+      notes: wfNotes.trim() || undefined,
+    };
+    if (woEdit) {
+      saveWorkOrders(workOrders.map(w => w.id === woEdit.id ? wo : w));
+    } else {
+      saveWorkOrders([wo, ...workOrders]);
+    }
+    setWoModal(false);
+  };
+
+  const deleteWo = (id: string) => saveWorkOrders(workOrders.filter(w => w.id !== id));
+
+  const PRIORITY_CLR: Record<string,string> = { urgent:'bg-red-500', high:'bg-orange-400', medium:'bg-amber-400', low:'bg-slate-300' };
+  const PRIORITY_TXT: Record<string,string> = { urgent:'紧急', high:'高', medium:'中', low:'低' };
+  const STATUS_CLR:   Record<string,string> = { completed:'bg-emerald-100 text-emerald-700', in_progress:'bg-blue-100 text-blue-700', pending:'bg-slate-100 text-slate-600' };
+  const STATUS_TXT:   Record<string,string> = { completed:'已完成', in_progress:'进行中', pending:'待处理' };
+
+  // ── Supabase / Pro-Maintenance sync ──────────────────────────────────────
+  const [maintRecords,    setMaintRecords]    = useState<import('./lib/maintenance-supabase').MaintRecord[]>([]);
+  const [supabaseMachines,setSupabaseMachines]= useState<import('./lib/maintenance-supabase').MachineInfo[]>([]);
+  const [syncStatus,      setSyncStatus]      = useState<'idle'|'syncing'|'ok'|'err'>('idle');
+  const [lastSync,        setLastSync]        = useState<string>('');
+
   const syncFromMaintenance = async () => {
     setSyncStatus('syncing');
     try {
       const { fetchMaintenanceRecords, fetchMachines } = await import('./lib/maintenance-supabase');
-      const [recs, machineList] = await Promise.all([fetchMaintenanceRecords(), fetchMachines()]);
+      // Fetch all records (no date filter) to get full machine list & history
+      const [recs, machineList] = await Promise.all([
+        fetchMaintenanceRecords(),
+        fetchMachines(),
+      ]);
       setMaintRecords(recs);
-      // Auto-seed machine list from Supabase if IDB list is empty
-      const stored = await idbGet<MsMachine[]>('msMachineList');
-      if (!stored?.length && machineList.length > 0) {
-        const newList: MsMachine[] = machineList.map(m => ({
-          name: m.name,
-          category: _isForklift(m.name) ? 'FORKLIFT' : _isCrane(m.name) ? 'CRANE' : 'PRODUCTION'
-        }));
-        setMsList(newList);
-        idbSet('msMachineList', newList);
-      }
-      setLastSync(new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}));
+      if (machineList.length > 0) setSupabaseMachines(machineList);
+      setLastSync(new Date().toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit' }));
       setSyncStatus('ok');
     } catch { setSyncStatus('err'); }
   };
 
+  const pushToMaintenance = async (entry: { machineName:string; shift:'AM'|'PM'; type:string; duration:number; reason?:string; date:string }) => {
+    try {
+      const { pushMaintenanceRecord } = await import('./lib/maintenance-supabase');
+      await pushMaintenanceRecord(entry);
+    } catch (e) { console.error('push to maintenance failed', e); }
+  };
+
   useEffect(() => { syncFromMaintenance(); }, []);
 
-  // ── Helpers ────────────────────────────────────────────────────────────
-  const _isForklift = (n: string) => {
-    const l = n.toLowerCase();
-    return l.includes('forklift')||l.includes('叉车')||l.includes('linde')||l.includes('toyota')||l.includes('nissan')||l.includes('hyster')||l==='jcb';
-  };
-  const _isCrane = (n: string) => {
-    const l = n.toLowerCase();
-    return l.includes('crane')||l.includes('行车')||l.includes('天车')||/^[gc]\d+/.test(l);
-  };
-  const _getCraneBay = (n: string): 1|2|0 => {
-    const u = n.toUpperCase();
-    if (/^C1[1-6]($|\s)/.test(u)) return 1;
-    if (/^C2[1-6]($|\s)/.test(u)) return 2;
-    return 0;
+  const getMachineStatus = (name: string) =>
+    machineStatuses[name] ?? machines.find(m => m.name === name)?.status ?? 'run';
+
+  const setMachineStatus = (name: string, status: string) => {
+    const updated = { ...machineStatuses, [name]: status };
+    setMachineStatuses(updated);
+    localStorage.setItem('machineStatuses', JSON.stringify(updated));
+    setStatusModal(null);
+    // Auto-open quick downtime recorder for fault/maintenance
+    if (status === 'error' || status === 'warn') {
+      const h = new Date().getHours();
+      const shift: 'AM'|'PM' = h >= 6 && h < 14 ? 'AM' : 'PM';
+      setQuickDt({ machine: name, dur: 30, type: status === 'warn' ? 'maintenance' : 'breakdown', shift, reason: '' });
+    }
   };
 
-  // ── Health Calculation ─────────────────────────────────────────────────
-  const calcHealth = (machineName: string): MsHealth => {
-    const recs = maintRecords.filter(r => r.machineName === machineName);
-    const now = new Date();
-    const statsByMonth: Record<string,{dt:number;plannedOff:number}> = {};
-    recs.forEach(r => {
-      const [y,m] = r.date.split('-').map(Number);
-      const key = `${y}-${String(m).padStart(2,'0')}`;
-      if (!statsByMonth[key]) statsByMonth[key] = {dt:0,plannedOff:0};
-      if (r.maintenanceType === 'Non-Production') {
-        statsByMonth[key].plannedOff += r.repairTime || 0;
-      } else {
-        statsByMonth[key].dt += r.totalDowntime || 0;
-      }
-    });
-    const start = new Date(calcStartDate);
-    const days = Math.max(1, Math.ceil((now.getTime()-start.getTime())/86400000));
-    const totalCal = parseFloat((days*14.5).toFixed(1));
-    const totalPlannedOff = parseFloat(Object.values(statsByMonth).reduce((s,v)=>s+v.plannedOff,0).toFixed(1));
-    const totalDt = parseFloat(Object.values(statsByMonth).reduce((s,v)=>s+v.dt,0).toFixed(1));
-    const totalSched = parseFloat((totalCal-totalPlannedOff).toFixed(1));
-    const globalAvail = totalSched>0 ? parseFloat(Math.max(0,Math.min(100,((totalSched-totalDt)/totalSched)*100)).toFixed(1)) : 100;
-    const history = Object.keys(statsByMonth).sort().map(key => {
-      const [y,m] = key.split('-').map(Number);
-      const daysInM = new Date(y,m,0).getDate();
-      const calH = daysInM*14.5;
-      const s = statsByMonth[key];
-      const sched = calH - s.plannedOff;
-      const avail = sched>0 ? Math.max(0,Math.min(100,((sched-s.dt)/sched)*100)) : 0;
-      const d = new Date(y,m-1);
-      return {label:`${d.toLocaleString('default',{month:'short'})} ${String(y).slice(2)}`, availability:parseFloat(avail.toFixed(1))};
-    });
-    const latest = [...recs].sort((a,b)=>b.date.localeCompare(a.date))[0];
-    let status: MsHealth['status'] = 'Running';
-    if (latest?.machineStatusAfter?.includes('Down')) status = 'Down';
-    else if (latest?.machineStatusAfter?.includes('Restricted')) status = 'Restricted';
-    const ninetyDaysAgo = new Date(); ninetyDaysAgo.setDate(now.getDate()-90);
-    const recentRecs = recs.filter(r => new Date(r.date)>=ninetyDaysAgo && r.maintenanceType!=='Non-Production');
-    const freqPenalty = Math.min(40, recentRecs.length*5);
-    const dtPenalty = Math.min(30, totalDt);
-    const healthScore = Math.max(20, Math.round(100-freqPenalty-dtPenalty));
-    return {status, globalAvailability:globalAvail, totalCalendarHours:totalCal, totalScheduledHours:totalSched, totalPlannedOffHours:totalPlannedOff, totalDowntimeHours:totalDt, healthScore, history, lastRecord: latest ? {date:latest.date, repairResult:latest.repairResult, faultArea:latest.faultArea, technician:latest.technician} : undefined};
+  const saveQuickDt = () => {
+    if (!quickDt || quickDt.dur <= 0) { setQuickDt(null); return; }
+    const today = new Date().toISOString().slice(0,10);
+    const entry: MachineDowntimeEntry = {
+      id: Date.now().toString(), timestamp: Date.now(),
+      date: today,
+      machine: quickDt.machine, shift: quickDt.shift,
+      type: quickDt.type as MachineDowntimeEntry['type'],
+      duration: quickDt.dur,
+      notes: quickDt.reason.trim() || undefined,
+    };
+    const updated = [entry, ...dtLogs];
+    setDtLogs(updated);
+    localStorage.setItem('machineDowntimeLogs', JSON.stringify(updated));
+    // Push to Pro-Maintenance Supabase
+    pushToMaintenance({ machineName: quickDt.machine, shift: quickDt.shift, type: quickDt.type, duration: quickDt.dur, reason: quickDt.reason || undefined, date: today });
+    setQuickDt(null);
   };
 
-  // ── Save helpers ───────────────────────────────────────────────────────
-  const saveMsList    = (list: MsMachine[]) => { setMsList(list); idbSet('msMachineList', list); };
-  const saveMsImages  = (imgs: Record<string,string>) => { setMsImages(imgs); idbSet('msMachineImages', imgs); };
-  const saveMsMeta    = (meta: Record<string,any>) => { setMsMeta(meta); idbSet('msMachineMeta', meta); };
-  const saveWorkOrders = (wo: WorkOrder[]) => { setWorkOrders(wo); idbSet('machineWorkOrders', wo); };
-
-  const resizeImg = (file: File): Promise<string> => new Promise(resolve => {
-    const img = new Image(); const url = URL.createObjectURL(file);
-    img.onload = () => {
-      const MAX=900; let [w,h]=[img.width,img.height];
-      if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}
-      const c=document.createElement('canvas');c.width=w;c.height=h;
-      c.getContext('2d')!.drawImage(img,0,0,w,h);URL.revokeObjectURL(url);
-      resolve(c.toDataURL('image/jpeg',0.8));
-    };img.src=url;
+  const [dtLogs, setDtLogs] = useState<MachineDowntimeEntry[]>(() => {
+    try { return JSON.parse(localStorage.getItem('machineDowntimeLogs') || '[]'); } catch { return []; }
   });
+  const [addModal, setAddModal] = useState(false);
+  const [fMachine,  setFMachine]  = useState(machines[0].name);
+  const [fShift,    setFShift]    = useState<'AM'|'PM'>('AM');
+  const [fType,     setFType]     = useState<MachineDowntimeEntry['type']>('breakdown');
+  const [fDuration, setFDuration] = useState('');
+  const [fDate,     setFDate]     = useState(new Date().toISOString().slice(0,10));
+  const [fNotes,    setFNotes]    = useState('');
 
-  // ── Work Order helpers ─────────────────────────────────────────────────
-  const openAddWo = (machine?:string) => {
-    setWoEdit(null);
-    setWfMachine(machine||msList[0]?.name||'');
-    setWfDesc('');setWfStatus('pending');setWfFixed(false);setWfWorking(true);
-    setWfPlanned(false);setWfFitter('');setWfDate(new Date().toISOString().slice(0,10));
-    setWfPriority('medium');setWfHours('');setWfActualH('');setWfNotes('');setWfPhotos([]);
-    setWoModal(true);
-  };
-  const openEditWo = (wo:WorkOrder) => {
-    setWoEdit(wo);
-    setWfMachine(wo.machine);setWfDesc(wo.description);setWfStatus(wo.status);
-    setWfFixed(wo.isMachineFixed);setWfWorking(wo.isMachineWorking);setWfPlanned(wo.isPlannedDowntime);
-    setWfFitter(wo.fitter);setWfDate(wo.date);setWfPriority(wo.priority);
-    setWfHours(wo.estimatedHours?String(wo.estimatedHours):'');
-    setWfActualH(wo.actualHours?String(wo.actualHours):'');
-    setWfNotes(wo.notes??'');setWfPhotos([...wo.photos]);
-    setWoModal(true);
-  };
-  const saveWoForm = () => {
-    if(!wfDesc.trim())return;
-    const wo:WorkOrder={
-      id:woEdit?.id??`wo-${Date.now()}`,
-      machine:wfMachine,description:wfDesc,status:wfStatus,
-      isMachineFixed:wfFixed,isMachineWorking:wfWorking,isPlannedDowntime:wfPlanned,
-      fitter:wfFitter,date:wfDate,
-      completedDate:wfStatus==='completed'?(woEdit?.completedDate||new Date().toISOString().slice(0,10)):undefined,
-      photos:wfPhotos,priority:wfPriority,
-      estimatedHours:wfHours?parseFloat(wfHours):undefined,
-      actualHours:wfActualH?parseFloat(wfActualH):undefined,
-      notes:wfNotes.trim()||undefined,
-    };
-    if(woEdit){saveWorkOrders(workOrders.map(w=>w.id===woEdit.id?wo:w));}
-    else{saveWorkOrders([wo,...workOrders]);}
-    setWoModal(false);
+  const saveDtLogs = (logs: MachineDowntimeEntry[]) => {
+    setDtLogs(logs); localStorage.setItem('machineDowntimeLogs', JSON.stringify(logs));
   };
 
-  const WO_PRIORITY_CLR: Record<string,string>={urgent:'bg-red-500',high:'bg-orange-400',medium:'bg-amber-400',low:'bg-slate-300'};
-  const WO_PRIORITY_TXT: Record<string,string>={urgent:'紧急',high:'高',medium:'中',low:'低'};
-  const WO_STATUS_CLR:   Record<string,string>={completed:'bg-emerald-100 text-emerald-700',in_progress:'bg-blue-100 text-blue-700',pending:'bg-slate-100 text-slate-600'};
-  const WO_STATUS_TXT:   Record<string,string>={completed:'已完成',in_progress:'进行中',pending:'待处理'};
+  const now = new Date();
+  const thisYear = now.getFullYear(); const thisMonth = now.getMonth();
+  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const monthLogs = dtLogs.filter(l => { const d = new Date(l.date); return d.getFullYear()===thisYear && d.getMonth()===thisMonth; });
 
-  // ── Grouped machine lists ──────────────────────────────────────────────
-  const prodMachines     = msList.filter(m=>m.category==='PRODUCTION');
-  const forkliftMachines = msList.filter(m=>m.category==='FORKLIFT');
-  const craneMachines    = msList.filter(m=>m.category==='CRANE');
-  const otherMachines    = msList.filter(m=>m.category==='OTHER');
-  const otherSectionNames= [...new Set(otherMachines.map(m=>m.section||'其他'))];
+  // Merge Supabase maintenance records into downtime calculation
+  const maintDtMins = (name: string) =>
+    maintRecords.filter(r => r.machineName === name).reduce((s,r) => s + (r.totalDowntime ?? 0), 0);
+  const localDtMins = (name: string) =>
+    monthLogs.filter(l => l.machine === name && l.type !== 'no_plan').reduce((s,l) => s + l.duration, 0);
+  const combinedDtMins = (name: string) => Math.max(maintDtMins(name), localDtMins(name)); // use whichever is larger
 
-  // ── Machine Card ───────────────────────────────────────────────────────
-  const MachineCard = ({machine}:{machine:MsMachine}) => {
-    const h = calcHealth(machine.name);
-    const photo = msImages[machine.name];
-    const dotClr = h.status==='Down'?'bg-red-500 animate-pulse':h.status==='Restricted'?'bg-amber-500':'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]';
-    const borderClr = h.status==='Down'?'border-red-200':h.status==='Restricted'?'border-amber-200':'border-slate-200';
-    const headerBg  = h.status==='Down'?'bg-red-50':h.status==='Restricted'?'bg-amber-50':'bg-slate-50/50';
-    const iconEl = machine.category==='FORKLIFT'
-      ? <Truck className={`w-4 h-4 ${h.status==='Down'?'text-red-500':'text-orange-600'}`}/>
-      : machine.category==='CRANE'
-      ? <Hammer className={`w-4 h-4 ${h.status==='Down'?'text-red-500':'text-indigo-600'}`}/>
-      : <Monitor className={`w-4 h-4 ${h.status==='Down'?'text-red-500':'text-blue-600'}`}/>;
+  const totalDtMins  = machines.reduce((s,m) => s + combinedDtMins(m.name), 0);
+  const noPlanMins   = monthLogs.filter(l => l.type === 'no_plan').reduce((s,l) => s+l.duration, 0);
+  const daysElapsed   = now.getDate();
+  const shiftMins     = 8 * 60 - 45;                                        // 8h - 45min break = 435min/shift
+  const totalPlanMins = machines.length * daysElapsed * 2 * shiftMins;      // 2 shifts/day
+  const uptimePct     = Math.max(0, 100 - totalDtMins / totalPlanMins * 100).toFixed(1);
+  const fmtH         = (m: number) => m >= 60 ? `${(m/60).toFixed(1)}h` : `${m}m`;
 
-    const handleOpenEdit = (e:React.MouseEvent) => {
-      e.stopPropagation();
-      setEditForm({oldName:machine.name,name:machine.name,category:machine.category,section:machine.section||'',isNewSection:false});
-      setIsEditModalOpen(true);
-    };
-    const handleDelete = (e:React.MouseEvent) => {
-      e.stopPropagation();
-      if(window.confirm(`确认删除设备 "${machine.name}"？`)) saveMsList(msList.filter(m=>m.name!==machine.name));
-    };
+  const byMachine = machines.map(m => ({ name: m.name, mins: combinedDtMins(m.name) })).sort((a,b)=>b.mins-a.mins);
+  const worst = byMachine[0];
 
-    return (
-      <div onClick={()=>setSelectedMachine(machine.name)}
-        className={`group bg-white rounded-xl border-2 ${borderClr} hover:border-blue-400 transition-all cursor-pointer flex flex-col shadow-sm hover:shadow-xl hover:-translate-y-1 overflow-hidden relative`}>
-        {/* Edit/Delete overlay */}
-        <div className="absolute top-2 right-2 flex gap-1 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={handleOpenEdit} className="p-1.5 bg-white/90 rounded-lg text-slate-500 hover:text-blue-600 shadow-sm border border-slate-200"><Edit2 className="w-3 h-3"/></button>
-          <button onClick={handleDelete} className="p-1.5 bg-white/90 rounded-lg text-slate-500 hover:text-red-600 shadow-sm border border-slate-200"><Trash2 className="w-3 h-3"/></button>
-        </div>
-        {/* Photo area */}
-        <div className="h-28 bg-slate-50 relative overflow-hidden border-b border-slate-100 flex items-center justify-center">
-          {photo ? (
-            <img src={photo} className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"/>
-          ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 gap-1">
-              <div className="w-10 h-10 bg-slate-200 rounded-lg"/>
-              <span className="text-[7px] font-black uppercase tracking-tighter opacity-30">Asset Visual</span>
-            </div>
-          )}
-        </div>
-        {/* Header */}
-        <div className={`px-4 py-2 flex justify-between items-center border-b ${headerBg}`}>
-          <div className="flex items-center gap-2 min-w-0">{iconEl}<h3 className="text-xs font-bold text-slate-800 truncate uppercase tracking-tight">{machine.name}</h3></div>
-          <div className={`w-2.5 h-2.5 rounded-full ${dotClr}`}/>
-        </div>
-        {/* Status text */}
-        <div className="px-4 pt-1.5">
-          <span className={`text-[9px] font-bold ${h.status==='Down'?'text-red-500':h.status==='Restricted'?'text-amber-500':'text-emerald-600'}`}>{h.status}</span>
-          {h.lastRecord && <span className="text-[8px] text-slate-300 ml-2">{h.lastRecord.date}</span>}
-        </div>
-        {/* Metrics */}
-        <div className="px-4 py-2.5 space-y-1.5">
-          <div className="flex justify-between items-center text-[9px]">
-            <span className="font-bold text-slate-400 uppercase">AVAIL: <span className={h.globalAvailability<85?'text-red-600':'text-slate-700'}>{h.globalAvailability}%</span></span>
-            <span className="font-bold text-slate-400 uppercase">HEALTH: <span className={h.healthScore<85?'text-orange-600':'text-slate-700'}>{h.healthScore}%</span></span>
-          </div>
-          <div className="w-full bg-slate-100 h-1 rounded-full overflow-hidden">
-            <div className={`h-full rounded-full transition-all duration-1000 ${h.healthScore<50?'bg-red-500':h.healthScore<85?'bg-orange-500':'bg-emerald-500'}`} style={{width:`${h.healthScore}%`}}/>
-          </div>
-        </div>
-      </div>
-    );
+  const breakMins = monthLogs.filter(l=>l.type==='breakdown').reduce((s,l)=>s+l.duration,0);
+  const changeMins= monthLogs.filter(l=>l.type==='changeover').reduce((s,l)=>s+l.duration,0);
+  const maintMins = monthLogs.filter(l=>l.type==='maintenance').reduce((s,l)=>s+l.duration,0);
+  const amMins    = monthLogs.filter(l=>l.shift==='AM').reduce((s,l)=>s+l.duration,0);
+  const pmMins    = monthLogs.filter(l=>l.shift==='PM').reduce((s,l)=>s+l.duration,0);
+
+  const handleAdd = () => {
+    if (!fDuration) return;
+    saveDtLogs([{ id:Date.now().toString(), timestamp:Date.now(), date:fDate, machine:fMachine, shift:fShift, type:fType, duration:parseInt(fDuration)||0, notes:fNotes.trim()||undefined }, ...dtLogs]);
+    setAddModal(false); setFDuration(''); setFNotes('');
   };
 
-  // ── Category Header ────────────────────────────────────────────────────
-  const CategoryHeader = ({title,icon:Icon,color,onAdd}:{title:string;icon:any;color:string;onAdd?:()=>void}) => (
-    <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-      <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 ${color} rounded-xl flex items-center justify-center text-white shadow-sm`}><Icon className="w-5 h-5"/></div>
-        <div>
-          <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">{title}</h3>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Factory Operations Asset Group</p>
-        </div>
-      </div>
-      {onAdd && (
-        <button onClick={onAdd} className="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-900 transition-all shadow-sm">
-          <Plus className="w-4 h-4"/> 添加设备
+  // ── All machines: hardcoded + Supabase + any that appear in records ──
+  const hardcodedNames = new Set(machines.map(m => m.name));
+  const allMachines: { name: string }[] = [
+    ...machines,
+    ...supabaseMachines.filter(m => !hardcodedNames.has(m.name)).map(m => ({ name: m.name })),
+  ];
+  const knownMachineNames = new Set(allMachines.map(m => m.name));
+  [...new Set<string>(maintRecords.map(r => r.machineName))]
+    .filter((n): n is string => !!n && !knownMachineNames.has(n))
+    .forEach(n => allMachines.push({ name: n }));
+
+  const shiftPlanH = (8 - 45/60) * 2 * new Date().getDate();
+  const msNow = new Date();
+
+  return (
+    <SectionWrapper title="Machine - Plant Efficiency" icon={Cpu} color={color}>
+      {/* Sync status bar */}
+      <div className="flex items-center gap-3 text-[9px]">
+        <button onClick={syncFromMaintenance} disabled={syncStatus==='syncing'}
+          className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all',
+            syncStatus==='syncing' ? 'bg-blue-50 text-blue-400' :
+            syncStatus==='ok'     ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' :
+            syncStatus==='err'    ? 'bg-red-50 text-red-500 hover:bg-red-100' :
+            'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200')}>
+          <RefreshCw size={11} className={syncStatus==='syncing' ? 'animate-spin' : ''} />
+          {syncStatus==='syncing' ? '同步中...' : '同步保养系统'}
         </button>
-      )}
-    </div>
-  );
-
-  // ── Render machine grid for a given list ──────────────────────────────
-  const MachineGrid = ({list}:{list:MsMachine[]}) => (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
-      {list.map(m=><React.Fragment key={m.name}><MachineCard machine={m}/></React.Fragment>)}
-      {list.length===0 && <div className="col-span-full text-center text-slate-300 text-xs py-8">暂无设备 — 点击「添加设备」</div>}
-    </div>
-  );
-
-  // ── Render by tab ──────────────────────────────────────────────────────
-  const renderList = () => {
-    const openAdd = (cat:MsMachine['category'],section='') => {
-      setAddForm({name:'',category:cat,section,isNewSection:false});
-      setIsAddModalOpen(true);
-    };
-
-    if (activeTab==='FORKLIFTS') return (
-      <div className="space-y-6 pb-20">
-        <CategoryHeader title="物流叉车 (Logistics)" icon={Truck} color="bg-orange-600" onAdd={()=>openAdd('FORKLIFT')}/>
-        <MachineGrid list={forkliftMachines}/>
+        {lastSync && <span className="text-slate-400">上次同步 {lastSync} · {maintRecords.length} 条记录</span>}
+        {syncStatus==='ok' && <span className="text-emerald-500 font-bold">✓ 已连接 Pro-Maintenance</span>}
+        {syncStatus==='err' && <span className="text-red-400">✗ 连接失败</span>}
       </div>
-    );
-
-    if (activeTab==='CRANES') {
-      const bay1 = craneMachines.filter(m=>_getCraneBay(m.name)!==2);
-      const bay2 = craneMachines.filter(m=>_getCraneBay(m.name)===2);
-      return (
-        <div className="space-y-6 pb-20">
-          <CategoryHeader title="车间行车 (Cranes)" icon={Hammer} color="bg-indigo-600" onAdd={()=>openAdd('CRANE')}/>
-          {[{label:'Bay 1 Section',list:bay1},{label:'Bay 2 Section',list:bay2}].map(({label,list})=>
-            list.length>0&&(
-              <div key={label} className="bg-slate-50/50 p-6 rounded-xl border border-slate-100">
-                <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><div className="w-1.5 h-3 bg-indigo-400 rounded-full"/>{label}</h4>
-                <MachineGrid list={list}/>
+      {/* ── Quick downtime recorder ───────────────────────────── */}
+      {quickDt && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setQuickDt(null)}>
+          <div className="bg-white rounded-2xl p-5 w-72 shadow-2xl" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">⏱ 停机记录</p>
+                <p className="text-[16px] font-black text-slate-800">{quickDt.machine}</p>
               </div>
-            )
-          )}
-          {craneMachines.length===0&&<div className="text-center text-slate-300 text-xs py-8">暂无行车设备</div>}
-        </div>
-      );
-    }
-
-    if (activeTab==='OTHERS') {
-      const sections = otherSectionNames.length>0 ? otherSectionNames : ['其他'];
-      return (
-        <div className="space-y-6 pb-20">
-          <CategoryHeader title="其他设备 (Others)" icon={Cog} color="bg-teal-600" onAdd={()=>openAdd('OTHER')}/>
-          {sections.map(sec=>{
-            const list = otherMachines.filter(m=>(m.section||'其他')===sec);
-            return (
-              <div key={sec} className="bg-slate-50/50 p-6 rounded-xl border border-slate-100">
-                <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><div className="w-1.5 h-3 bg-teal-400 rounded-full"/>{sec}</h4>
-                <MachineGrid list={list}/>
-              </div>
-            );
-          })}
-        </div>
-      );
-    }
-
-    if (activeTab==='PRODUCTION') return (
-      <div className="space-y-6 pb-20">
-        <CategoryHeader title="生产设备 (Production)" icon={Monitor} color="bg-blue-600" onAdd={()=>openAdd('PRODUCTION')}/>
-        <MachineGrid list={prodMachines}/>
-      </div>
-    );
-
-    // SUMMARY
-    const bay1 = craneMachines.filter(m=>_getCraneBay(m.name)!==2);
-    const bay2 = craneMachines.filter(m=>_getCraneBay(m.name)===2);
-    return (
-      <div className="space-y-12 pb-20">
-        {prodMachines.length>0&&(
-          <div className="space-y-4">
-            <CategoryHeader title="生产设备 (Production)" icon={Monitor} color="bg-blue-600" onAdd={()=>openAdd('PRODUCTION')}/>
-            <MachineGrid list={prodMachines}/>
-          </div>
-        )}
-        {forkliftMachines.length>0&&(
-          <div className="space-y-4">
-            <CategoryHeader title="物流叉车 (Logistics)" icon={Truck} color="bg-orange-600" onAdd={()=>openAdd('FORKLIFT')}/>
-            <MachineGrid list={forkliftMachines}/>
-          </div>
-        )}
-        {craneMachines.length>0&&(
-          <div className="space-y-6">
-            <CategoryHeader title="车间行车 (Cranes)" icon={Hammer} color="bg-indigo-600" onAdd={()=>openAdd('CRANE')}/>
-            <div className="space-y-4">
-              {[{label:'Bay 1 Section',list:bay1},{label:'Bay 2 Section',list:bay2}].map(({label,list})=>
-                list.length>0&&(
-                  <div key={label} className="bg-slate-50/50 p-6 rounded-xl border border-slate-100">
-                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><div className="w-1.5 h-3 bg-indigo-400 rounded-full"/>{label}</h4>
-                    <MachineGrid list={list}/>
-                  </div>
-                )
-              )}
+              <button onClick={() => setQuickDt(null)} className="text-slate-300 hover:text-slate-500"><X size={16}/></button>
             </div>
-          </div>
-        )}
-        {otherMachines.length>0&&(
-          <div className="space-y-6">
-            <CategoryHeader title="其他设备 (Others)" icon={Cog} color="bg-teal-600" onAdd={()=>openAdd('OTHER')}/>
-            {otherSectionNames.map(sec=>{
-              const list=otherMachines.filter(m=>(m.section||'其他')===sec);
-              return (
-                <div key={sec} className="bg-slate-50/50 p-6 rounded-xl border border-slate-100">
-                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><div className="w-1.5 h-3 bg-teal-400 rounded-full"/>{sec}</h4>
-                  <MachineGrid list={list}/>
-                </div>
-              );
-            })}
-          </div>
-        )}
-        {msList.length===0&&(
-          <div className="text-center py-20 text-slate-300">
-            <Monitor className="w-12 h-12 mx-auto mb-3 opacity-30"/>
-            <p className="font-bold text-sm">暂无设备</p>
-            <p className="text-xs mt-1">点击「同步保养系统」自动导入，或手动添加设备</p>
-          </div>
-        )}
-      </div>
-    );
-  };
 
-  // ── Machine Detail Modal ───────────────────────────────────────────────
-  const MachineDetailModal = () => {
-    if(!selectedMachine) return null;
-    const h = calcHealth(selectedMachine);
-    const photo = msImages[selectedMachine];
-    const meta = msMeta[selectedMachine]||{};
-    const machine = msList.find(m=>m.name===selectedMachine);
-    const isFk = machine?.category==='FORKLIFT';
-    const isCr = machine?.category==='CRANE';
-    const iconBg = isFk?'bg-orange-600':isCr?'bg-indigo-600':'bg-blue-600';
-    const StatusIcon = isFk?Truck:isCr?Hammer:Activity;
+            {/* Quick duration presets */}
+            <p className="text-[8px] font-bold text-slate-400 uppercase mb-2">快速选择时长</p>
+            <div className="grid grid-cols-4 gap-1.5 mb-3">
+              {[15, 30, 60, 90].map(m => (
+                <button key={m} onClick={() => setQuickDt(q => q ? { ...q, dur: m } : q)}
+                  className={cn('py-2 rounded-xl text-[10px] font-black transition-colors',
+                    quickDt.dur === m ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+                  {m < 60 ? `${m}分` : `${m/60}小时`}
+                </button>
+              ))}
+            </div>
 
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-300">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl my-auto border border-slate-200 overflow-hidden flex flex-col max-h-[95vh] animate-in zoom-in-95 duration-300">
-          {/* Header */}
-          <div className="bg-white border-b px-8 py-4 flex justify-between items-start z-10 sticky top-0">
-            <div className="flex items-center gap-5">
-              <div className={`w-14 h-14 ${iconBg} rounded-xl flex items-center justify-center text-white shadow-lg`}>
-                <StatusIcon className="w-8 h-8"/>
+            {/* Custom duration */}
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-[9px] text-slate-400 shrink-0">自定义</span>
+              <input type="number" value={quickDt.dur} min={1}
+                onChange={e => setQuickDt(q => q ? { ...q, dur: parseInt(e.target.value) || 0 } : q)}
+                className="flex-1 text-[11px] font-black border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-slate-400 text-right" />
+              <span className="text-[9px] text-slate-400 shrink-0">分钟</span>
+            </div>
+
+            {/* Type + Shift */}
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              <div>
+                <p className="text-[8px] font-bold text-slate-400 uppercase mb-1">类型</p>
+                <select value={quickDt.type} onChange={e => setQuickDt(q => q ? { ...q, type: e.target.value } : q)}
+                  className="w-full text-[10px] border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-slate-400">
+                  <option value="breakdown">故障</option>
+                  <option value="maintenance">保养</option>
+                  <option value="changeover">换模</option>
+                  <option value="no_plan">No Plan</option>
+                </select>
               </div>
               <div>
-                <div className="flex items-center gap-3 mb-1">
-                  <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tight leading-none">{selectedMachine}</h2>
-                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase border shadow-sm ${h.status==='Down'?'bg-red-50 text-red-600 border-red-200':h.status==='Restricted'?'bg-amber-50 text-amber-600 border-amber-200':'bg-emerald-50 text-emerald-600 border-emerald-200'}`}>{h.status}</span>
-                </div>
-                <p className="text-[10px] text-slate-400 font-bold">{meta.model||'—'} · S/N: {meta.serialNumber||'—'}</p>
+                <p className="text-[8px] font-bold text-slate-400 uppercase mb-1">班次</p>
+                <select value={quickDt.shift} onChange={e => setQuickDt(q => q ? { ...q, shift: e.target.value as 'AM'|'PM' } : q)}
+                  className="w-full text-[10px] border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-slate-400">
+                  <option value="AM">早班 AM</option>
+                  <option value="PM">下午班 PM</option>
+                </select>
               </div>
             </div>
-            <button onClick={()=>setSelectedMachine(null)} className="p-2.5 bg-slate-100 hover:bg-slate-200 rounded-full transition-all hover:rotate-90">
-              <X className="w-6 h-6 text-slate-400"/>
-            </button>
+
+            {/* Reason input */}
+            <div>
+              <p className="text-[8px] font-bold text-slate-400 uppercase mb-1">故障原因</p>
+              <input
+                type="text"
+                value={quickDt.reason}
+                onChange={e => setQuickDt(q => q ? { ...q, reason: e.target.value } : q)}
+                placeholder="简述故障原因（可选）"
+                className="w-full text-[11px] border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-slate-400 placeholder:text-slate-300"
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2">
+              <button onClick={() => setQuickDt(null)}
+                className="flex-1 py-2 rounded-xl border border-slate-200 text-[10px] font-bold text-slate-400 hover:bg-slate-50">
+                跳过
+              </button>
+              <button onClick={saveQuickDt}
+                className="flex-2 px-5 py-2 rounded-xl bg-red-500 text-white text-[10px] font-black hover:bg-red-600 transition-colors">
+                保存记录 ✓
+              </button>
+            </div>
           </div>
+        </div>
+      )}
 
-          {/* Body */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50">
-            {/* KPI Row */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-blue-600 p-5 rounded-xl text-white shadow-lg relative overflow-hidden">
-                <div className="text-white/60 text-[10px] font-black uppercase mb-1">Global Availability</div>
-                <div className="text-3xl font-black">{h.globalAvailability}%</div>
-                <div className="absolute -right-3 -bottom-3 w-20 h-20 bg-white/10 rounded-full"/>
+      {/* ── Downtime log modal ────────────────────────────────── */}
+      {addModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setAddModal(false)}>
+          <div className="bg-white rounded-2xl p-5 w-80 shadow-2xl flex flex-col gap-3" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-black text-slate-800">记录停机</h3>
+              <button onClick={() => setAddModal(false)} className="text-slate-400 hover:text-slate-600"><X size={16}/></button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <div className="text-[8px] font-bold text-slate-400 uppercase mb-0.5">机器</div>
+                <select value={fMachine} onChange={e=>setFMachine(e.target.value)} className="w-full text-[10px] border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-blue-400">
+                  {machines.map(m=><option key={m.name}>{m.name}</option>)}
+                </select>
               </div>
-              <div className="bg-white p-5 rounded-xl border-2 border-slate-100 shadow-sm flex flex-col justify-center">
-                <div className="text-slate-400 text-[10px] font-black uppercase mb-1">Scheduled Hours</div>
-                <div className="text-2xl font-black text-slate-800">{h.totalScheduledHours}<span className="text-xs font-bold opacity-30 ml-1">hrs</span></div>
-              </div>
-              <div className="bg-white p-5 rounded-xl border-2 border-amber-100 shadow-sm flex flex-col justify-center">
-                <div className="text-slate-400 text-[10px] font-black uppercase mb-1">Planned Off</div>
-                <div className="text-2xl font-black text-amber-600">{h.totalPlannedOffHours}<span className="text-xs font-bold opacity-30 ml-1">hrs</span></div>
-              </div>
-              <div className="bg-white p-5 rounded-xl border-2 border-red-100 shadow-sm flex flex-col justify-center">
-                <div className="text-slate-400 text-[10px] font-black uppercase mb-1">Total Downtime</div>
-                <div className="text-2xl font-black text-red-600">{h.totalDowntimeHours}<span className="text-xs font-bold opacity-30 ml-1">hrs</span></div>
+              <div>
+                <div className="text-[8px] font-bold text-slate-400 uppercase mb-0.5">班次</div>
+                <select value={fShift} onChange={e=>setFShift(e.target.value as 'AM'|'PM')} className="w-full text-[10px] border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-blue-400">
+                  <option value="AM">早班 AM</option><option value="PM">下午班 PM</option>
+                </select>
               </div>
             </div>
-
-            {/* Chart + Photo */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 bg-white p-6 rounded-xl border-2 border-slate-100 shadow-sm flex flex-col">
-                <h3 className="font-black text-slate-800 text-sm uppercase mb-4 flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-blue-500"/> Availability History
-                </h3>
-                {h.history.length>0 ? (
-                  <div className="h-52 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={h.history} margin={{top:10,right:10,left:-20,bottom:0}}>
-                        <defs>
-                          <linearGradient id="msAvailGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15}/>
-                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
-                        <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fontSize:9,fill:'#94a3b8'}}/>
-                        <YAxis domain={[0,100]} axisLine={false} tickLine={false} tick={{fontSize:9,fill:'#94a3b8'}}/>
-                        <Tooltip contentStyle={{borderRadius:'12px',border:'none',boxShadow:'0 4px 6px rgba(0,0,0,0.1)',fontSize:'10px'}} formatter={(v:number)=>[`${v}%`,'Availability']}/>
-                        <Area type="monotone" dataKey="availability" stroke="#3b82f6" strokeWidth={2.5} fillOpacity={1} fill="url(#msAvailGrad)" dot={{r:4,strokeWidth:2,fill:'#fff'}}/>
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <div className="flex-1 flex items-center justify-center text-slate-300 text-xs">暂无历史数据</div>
-                )}
+            <div>
+              <div className="text-[8px] font-bold text-slate-400 uppercase mb-0.5">停机类型</div>
+              <select value={fType} onChange={e=>setFType(e.target.value as MachineDowntimeEntry['type'])} className="w-full text-[10px] border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-blue-400">
+                <option value="breakdown">故障 Breakdown</option>
+                <option value="changeover">换模 Changeover</option>
+                <option value="maintenance">保养 Maintenance</option>
+                <option value="no_plan">No Plan</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <div className="text-[8px] font-bold text-slate-400 uppercase mb-0.5">时长（分钟）</div>
+                <input type="number" value={fDuration} onChange={e=>setFDuration(e.target.value)} placeholder="60" className="w-full text-[10px] border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-blue-400" />
               </div>
-              <div className="bg-white p-6 rounded-xl border-2 border-slate-100 shadow-sm flex flex-col">
-                <h3 className="font-black text-slate-800 text-sm uppercase mb-4 flex items-center gap-2">
-                  <Camera className="w-4 h-4 text-indigo-500"/> Asset Visual
-                </h3>
-                {/* Photo area */}
-                <div className="flex-1 flex flex-col gap-4">
-                  <div className="relative bg-slate-50 rounded-xl overflow-hidden h-40 flex items-center justify-center border border-slate-100 group/photo cursor-pointer"
-                    onClick={()=>photo&&setPreviewImage(photo)}>
-                    {photo ? (
-                      <img src={photo} className="max-w-full max-h-full object-contain"/>
-                    ) : (
-                      <div className="text-slate-300 text-center">
-                        <Camera className="w-8 h-8 mx-auto mb-1 opacity-40"/>
-                        <span className="text-[9px]">No image</span>
-                      </div>
-                    )}
-                    <label className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover/photo:bg-black/30 transition-all cursor-pointer">
-                      <span className="text-white text-[10px] font-black opacity-0 group-hover/photo:opacity-100 flex items-center gap-1">
-                        <Upload className="w-3 h-3"/> 上传照片
-                      </span>
-                      <input type="file" accept="image/*" className="hidden" onChange={async e=>{
-                        const f=e.target.files?.[0];if(!f)return;
-                        const url=await resizeImg(f);
-                        saveMsImages({...msImages,[selectedMachine]:url});
-                      }}/>
-                    </label>
-                  </div>
-                  {/* Serial / Model */}
-                  <div className="space-y-2">
-                    <div>
-                      <label className="text-[9px] font-black text-slate-400 uppercase ml-0.5">Serial Number</label>
-                      <input className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold outline-none focus:border-blue-400"
-                        value={meta.serialNumber||''} placeholder="SN-XXXX"
-                        onChange={e=>saveMsMeta({...msMeta,[selectedMachine]:{...meta,serialNumber:e.target.value}})}/>
-                    </div>
-                    <div>
-                      <label className="text-[9px] font-black text-slate-400 uppercase ml-0.5">Model</label>
-                      <input className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold outline-none focus:border-blue-400"
-                        value={meta.model||''} placeholder="Model name"
-                        onChange={e=>saveMsMeta({...msMeta,[selectedMachine]:{...meta,model:e.target.value}})}/>
-                    </div>
-                  </div>
-                </div>
+              <div>
+                <div className="text-[8px] font-bold text-slate-400 uppercase mb-0.5">日期</div>
+                <input type="date" value={fDate} onChange={e=>setFDate(e.target.value)} className="w-full text-[10px] border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-blue-400" />
               </div>
             </div>
-
-            {/* Recent maintenance records for this machine */}
-            {maintRecords.filter(r=>r.machineName===selectedMachine).length>0&&(
-              <div className="bg-white rounded-xl border-2 border-slate-100 shadow-sm overflow-hidden">
-                <div className="px-6 py-3 border-b border-slate-100 flex items-center gap-2">
-                  <History className="w-4 h-4 text-slate-400"/>
-                  <span className="text-xs font-black text-slate-800 uppercase">Maintenance History</span>
-                  <span className="ml-auto text-[10px] text-slate-400">{maintRecords.filter(r=>r.machineName===selectedMachine).length} records</span>
-                </div>
-                <div className="overflow-x-auto max-h-64 overflow-y-auto">
-                  <table className="w-full text-[9px]">
-                    <thead className="sticky top-0 bg-slate-50">
-                      <tr className="border-b border-slate-100">
-                        {['日期','班次','故障区域','类型','难度','停机(h)','结果','技术员'].map(c=>(
-                          <th key={c} className="text-left px-3 py-2 font-bold text-slate-400 whitespace-nowrap">{c}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {maintRecords.filter(r=>r.machineName===selectedMachine).slice(0,30).map((r,i)=>(
-                        <tr key={r.id} className={`border-t border-slate-50 hover:bg-slate-50/60 ${i%2===1?'bg-slate-50/20':''}`}>
-                          <td className="px-3 py-1.5 font-bold text-slate-700 whitespace-nowrap">{r.date}</td>
-                          <td className="px-3 py-1.5"><span className={`px-1.5 py-0.5 rounded-full text-[7px] font-black ${r.shift==='AM'?'bg-blue-100 text-blue-700':'bg-amber-100 text-amber-700'}`}>{r.shift||'—'}</span></td>
-                          <td className="px-3 py-1.5 text-slate-600 max-w-[100px] truncate">{r.faultArea||'—'}</td>
-                          <td className="px-3 py-1.5 text-slate-500 whitespace-nowrap text-[8px]">{r.maintenanceType||'—'}</td>
-                          <td className="px-3 py-1.5">{r.difficulty?<span className={`font-black ${r.difficulty<=2?'text-emerald-600':r.difficulty<=3?'text-amber-500':'text-red-500'}`}>L{r.difficulty}</span>:'—'}</td>
-                          <td className={`px-3 py-1.5 font-black tabular-nums ${r.totalDowntime>0?'text-red-500':'text-slate-400'}`}>{r.totalDowntime>0?r.totalDowntime.toFixed(1):'—'}</td>
-                          <td className="px-3 py-1.5">{r.repairResult?<span className={`px-1.5 py-0.5 rounded text-[7px] font-bold ${{Fixed:'bg-emerald-100 text-emerald-700',Temporary:'bg-amber-100 text-amber-700','Not Fixed':'bg-red-100 text-red-600',Observation:'bg-blue-100 text-blue-700'}[r.repairResult]??'bg-slate-100 text-slate-500'}`}>{r.repairResult}</span>:'—'}</td>
-                          <td className="px-3 py-1.5 text-slate-500 whitespace-nowrap">{r.technician||'—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+            <div>
+              <div className="text-[8px] font-bold text-slate-400 uppercase mb-0.5">备注（可选）</div>
+              <input type="text" value={fNotes} onChange={e=>setFNotes(e.target.value)} placeholder="原因说明..." className="w-full text-[10px] border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-blue-400" />
+            </div>
+            <button onClick={handleAdd} className="w-full py-2 rounded-xl bg-slate-800 text-white text-[10px] font-black hover:bg-slate-700 transition-colors">保存记录</button>
+            {monthLogs.length > 0 && (
+              <div className="border-t border-slate-100 pt-2 max-h-32 overflow-y-auto">
+                {[...monthLogs].slice(0,8).map(l => (
+                  <div key={l.id} className="flex items-center justify-between text-[8px] text-slate-400 py-0.5">
+                    <span>{l.date} {l.machine} {l.shift}</span>
+                    <span className="text-slate-500 font-bold">{l.type === 'no_plan' ? 'No Plan' : l.type === 'breakdown' ? '故障' : l.type === 'changeover' ? '换模' : '保养'} {fmtH(l.duration)}</span>
+                    <button onClick={() => saveDtLogs(dtLogs.filter(x=>x.id!==l.id))} className="text-red-400 hover:text-red-600 ml-1">×</button>
+                  </div>
+                ))}
               </div>
             )}
           </div>
         </div>
-      </div>
-    );
-  };
+      )}
 
-  // ── Add Machine Modal ──────────────────────────────────────────────────
-  const AddMachineModal = () => (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-300">
-        <div className="bg-slate-50 px-8 py-6 border-b border-slate-100 flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-blue-600 rounded-2xl text-white shadow-lg"><Plus className="w-6 h-6"/></div>
-            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">添加新资产</h3>
-          </div>
-          <button onClick={()=>setIsAddModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full"><X className="w-6 h-6 text-slate-400"/></button>
-        </div>
-        <form onSubmit={e=>{
-          e.preventDefault();
-          const n=addForm.name.trim();if(!n)return;
-          const newM:MsMachine={name:n,category:addForm.category,section:addForm.section.trim()||undefined};
-          saveMsList([...msList,newM]);
-          setIsAddModalOpen(false);setAddForm({name:'',category:'PRODUCTION',section:'',isNewSection:false});
-        }} className="p-8 space-y-6">
-          <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">1. Asset Name</label>
-            <input required autoFocus className="w-full border-2 border-slate-100 rounded-xl px-4 py-3 text-sm font-black bg-white outline-none focus:border-blue-500"
-              placeholder="e.g. FT-3, TOYOTA..." value={addForm.name} onChange={e=>setAddForm(f=>({...f,name:e.target.value}))}/>
-          </div>
-          <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">2. Category</label>
-            <div className="grid grid-cols-2 gap-2">
-              {([
-                {id:'PRODUCTION',label:'生产设备',icon:Monitor},
-                {id:'FORKLIFT',label:'物流叉车',icon:Truck},
-                {id:'CRANE',label:'车间行车',icon:Hammer},
-                {id:'OTHER',label:'其他设备',icon:Cog},
-              ] as const).map(t=>(
-                <button key={t.id} type="button" onClick={()=>setAddForm(f=>({...f,category:t.id,section:''}))}
-                  className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl text-[10px] font-black border-2 transition-all ${addForm.category===t.id?'bg-blue-600 text-white border-blue-600 shadow-md':'bg-white text-slate-500 border-slate-100 hover:border-slate-200'}`}>
-                  <t.icon className="w-3.5 h-3.5"/>{t.label}
-                </button>
-              ))}
+      {/* ── KPI card strip ────────────────────────────────────── */}
+      <div className="grid gap-3 shrink-0" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr 1.6fr 1.6fr' }}>
+        {([
+          { label:'开机率',   sublabel:`(计划 ${shiftMins}min/班 × 2班) MTD`,   value:`${uptimePct}%`, accent: parseFloat(uptimePct)>=90?'#059669':parseFloat(uptimePct)>=75?'#D97706':'#DC2626', bg: parseFloat(uptimePct)>=90?'bg-green-50':parseFloat(uptimePct)>=75?'bg-amber-50':'bg-red-50' },
+          { label:'停机时间', sublabel:`${MONTH_NAMES[thisMonth]} Total`,  value: fmtH(totalDtMins), accent: totalDtMins>0?'#DC2626':'#059669', bg: totalDtMins>0?'bg-red-50':'bg-green-50' },
+          { label:'No Plan', sublabel:`${MONTH_NAMES[thisMonth]} Total`,   value: fmtH(noPlanMins),  accent: noPlanMins>0?'#D97706':'#059669', bg: noPlanMins>0?'bg-amber-50':'bg-green-50' },
+          { label:'停机最多', sublabel: worst.mins>0 ? `${fmtH(worst.mins)} this month` : 'No downtime recorded', value: worst.mins>0 ? worst.name : '—', accent: worst.mins>0?'#DC2626':'#059669', bg: worst.mins>0?'bg-red-50':'bg-green-50' },
+        ] as { label:string; sublabel:string; value:string; accent:string; bg:string }[]).map(({ label, sublabel, value, accent, bg }) => (
+          <div key={label} className={cn('rounded-xl px-3 py-3 flex items-center gap-3 border-2', bg)} style={{ borderColor: accent+'33' }}>
+            <button onClick={() => setAddModal(true)}
+              className="flex flex-col items-center justify-center rounded-lg w-14 h-14 shrink-0 hover:brightness-95 transition-all"
+              style={{ backgroundColor: accent+'22' }}>
+              <span className="text-xl font-black tabular-nums leading-none" style={{ color: accent }}>{value}</span>
+            </button>
+            <div className="flex flex-col gap-0.5 min-w-0">
+              <p className="text-xs font-black text-slate-800 leading-tight">{label}</p>
+              <p className="text-[10px] font-bold text-slate-400 leading-tight">{sublabel}</p>
             </div>
           </div>
-          {(addForm.category==='CRANE'||addForm.category==='OTHER')&&(
-            <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">3. Section / Bay</label>
-              {addForm.category==='CRANE' ? (
-                <select className="w-full border-2 border-slate-100 rounded-xl px-4 py-3 text-sm font-black bg-white outline-none"
-                  value={addForm.section} onChange={e=>setAddForm(f=>({...f,section:e.target.value}))}>
-                  <option value="">— Default / No Section —</option>
-                  <option value="Bay 1">Bay 1</option>
-                  <option value="Bay 2">Bay 2</option>
-                </select>
-              ) : (
-                <input className="w-full border-2 border-slate-100 rounded-xl px-4 py-3 text-sm font-black bg-white outline-none focus:border-blue-500"
-                  placeholder="e.g. Compressor Room..." value={addForm.section} onChange={e=>setAddForm(f=>({...f,section:e.target.value}))}/>
-              )}
-            </div>
-          )}
-          <button type="submit" className="w-full py-4 bg-slate-900 text-white font-black uppercase text-xs tracking-widest rounded-2xl hover:bg-black transition-all shadow-xl flex items-center justify-center gap-3">
-            <CheckCircle2 className="w-5 h-5 text-emerald-400"/> 确认添加
-          </button>
-        </form>
-      </div>
-    </div>
-  );
+        ))}
 
-  // ── Edit Machine Modal ─────────────────────────────────────────────────
-  const EditMachineModal = () => (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-300">
-        <div className="bg-slate-50 px-8 py-6 border-b border-slate-100 flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-blue-600 rounded-2xl text-white shadow-lg"><Edit2 className="w-6 h-6"/></div>
-            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">修改资产</h3>
-          </div>
-          <button onClick={()=>setIsEditModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full"><X className="w-6 h-6 text-slate-400"/></button>
-        </div>
-        <form onSubmit={e=>{
-          e.preventDefault();
-          const n=editForm.name.trim();if(!n)return;
-          const updated=msList.map(m=>m.name===editForm.oldName?{name:n,category:editForm.category,section:editForm.section.trim()||undefined}:m);
-          saveMsList(updated);
-          // Update images/meta keys if name changed
-          if(n!==editForm.oldName){
-            if(msImages[editForm.oldName]){const ni={...msImages};ni[n]=ni[editForm.oldName];delete ni[editForm.oldName];saveMsImages(ni);}
-            if(msMeta[editForm.oldName]){const nm={...msMeta};nm[n]=nm[editForm.oldName];delete nm[editForm.oldName];saveMsMeta(nm);}
-          }
-          setIsEditModalOpen(false);
-        }} className="p-8 space-y-6">
-          <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Asset Name</label>
-            <input required autoFocus className="w-full border-2 border-slate-100 rounded-xl px-4 py-3 text-sm font-black bg-white outline-none focus:border-blue-500"
-              value={editForm.name} onChange={e=>setEditForm(f=>({...f,name:e.target.value}))}/>
-          </div>
-          <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Category</label>
-            <div className="grid grid-cols-2 gap-2">
-              {([
-                {id:'PRODUCTION',label:'生产设备',icon:Monitor},
-                {id:'FORKLIFT',label:'物流叉车',icon:Truck},
-                {id:'CRANE',label:'车间行车',icon:Hammer},
-                {id:'OTHER',label:'其他设备',icon:Cog},
-              ] as const).map(t=>(
-                <button key={t.id} type="button" onClick={()=>setEditForm(f=>({...f,category:t.id,section:''}))}
-                  className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl text-[10px] font-black border-2 transition-all ${editForm.category===t.id?'bg-blue-600 text-white border-blue-600 shadow-md':'bg-white text-slate-500 border-slate-100 hover:border-slate-200'}`}>
-                  <t.icon className="w-3.5 h-3.5"/>{t.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          {(editForm.category==='CRANE'||editForm.category==='OTHER')&&(
-            <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Section / Bay</label>
-              {editForm.category==='CRANE' ? (
-                <select className="w-full border-2 border-slate-100 rounded-xl px-4 py-3 text-sm font-black bg-white outline-none"
-                  value={editForm.section} onChange={e=>setEditForm(f=>({...f,section:e.target.value}))}>
-                  <option value="">— Default / No Section —</option>
-                  <option value="Bay 1">Bay 1</option>
-                  <option value="Bay 2">Bay 2</option>
-                </select>
-              ) : (
-                <input className="w-full border-2 border-slate-100 rounded-xl px-4 py-3 text-sm font-black bg-white outline-none focus:border-blue-500"
-                  value={editForm.section} onChange={e=>setEditForm(f=>({...f,section:e.target.value}))}/>
-              )}
-            </div>
-          )}
-          <button type="submit" className="w-full py-4 bg-slate-900 text-white font-black uppercase text-xs tracking-widest rounded-2xl hover:bg-black transition-all shadow-xl flex items-center justify-center gap-3">
-            <Save className="w-5 h-5 text-emerald-400"/> 保存修改
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-
-  // ── Work Order Modal ───────────────────────────────────────────────────
-  const WorkOrderModal = () => (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={()=>setWoModal(false)}>
-      <div className="bg-white rounded-2xl shadow-2xl w-[520px] max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-          <h3 className="text-sm font-black text-slate-800">{woEdit?'编辑工单':'新建工单'}</h3>
-          <button onClick={()=>setWoModal(false)} className="text-slate-300 hover:text-slate-500"><X size={16}/></button>
-        </div>
-        <div className="p-5 flex flex-col gap-3">
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">机器</div>
-              <select value={wfMachine} onChange={e=>setWfMachine(e.target.value)} className="w-full text-[10px] border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-blue-400">
-                {msList.map(m=><option key={m.name}>{m.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">优先级</div>
-              <select value={wfPriority} onChange={e=>setWfPriority(e.target.value as WorkOrder['priority'])} className="w-full text-[10px] border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-blue-400">
-                <option value="urgent">紧急 Urgent</option>
-                <option value="high">高 High</option>
-                <option value="medium">中 Medium</option>
-                <option value="low">低 Low</option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">故障描述</div>
-            <textarea value={wfDesc} onChange={e=>setWfDesc(e.target.value)} rows={3} placeholder="描述故障现象和维修内容..."
-              className="w-full text-[10px] border border-slate-200 rounded-xl px-3 py-2 resize-none focus:outline-none focus:border-blue-400"/>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <div>
-              <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">状态</div>
-              <select value={wfStatus} onChange={e=>setWfStatus(e.target.value as WorkOrder['status'])} className="w-full text-[10px] border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none">
-                <option value="pending">待处理</option>
-                <option value="in_progress">进行中</option>
-                <option value="completed">已完成</option>
-              </select>
-            </div>
-            <div>
-              <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">Fitter</div>
-              <input value={wfFitter} onChange={e=>setWfFitter(e.target.value)} placeholder="姓名" className="w-full text-[10px] border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none"/>
-            </div>
-            <div>
-              <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">日期</div>
-              <input type="date" value={wfDate} onChange={e=>setWfDate(e.target.value)} className="w-full text-[10px] border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none"/>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            {([
-              {label:'Is Machine Fixed?',val:wfFixed,set:setWfFixed},
-              {label:'Is Machine Working?',val:wfWorking,set:setWfWorking},
-              {label:'Is Planned Downtime?',val:wfPlanned,set:setWfPlanned},
-            ] as const).map(({label,val,set})=>(
-              <button key={label} type="button" onClick={()=>(set as any)(!val)}
-                className={cn('flex flex-col items-center gap-1 py-2 rounded-xl border-2 text-[8px] font-bold transition-colors',val?'border-emerald-300 bg-emerald-50 text-emerald-700':'border-slate-200 bg-slate-50 text-slate-400')}>
-                <span className="text-[14px]">{val?'✓':'✗'}</span>
-                <span className="text-center leading-tight">{label}</span>
+        {/* 停机原因 CAUSE */}
+        <div className="rounded-xl p-3 border-2 bg-slate-50 flex flex-col gap-2" style={{ borderColor: '#47556933' }}>
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">停机原因 Cause</p>
+          <div className="flex gap-1.5 flex-1 items-center">
+            {[
+              { label:'故障', sub:'Breakdown',   mins: breakMins,  color:'#DC2626' },
+              { label:'换模', sub:'Changeover',  mins: changeMins, color:'#D97706' },
+              { label:'保养', sub:'Maintenance', mins: maintMins,  color:'#7C3AED' },
+            ].map(({ label, sub, mins, color }) => (
+              <button key={label} onClick={() => setAddModal(true)}
+                className="flex-1 flex flex-col items-center justify-center rounded-lg py-2 hover:brightness-95 transition-all"
+                style={{ backgroundColor: color+'15' }}>
+                <span className="text-lg font-black tabular-nums leading-none" style={{ color }}>{fmtH(mins)}</span>
+                <span className="text-[10px] font-black mt-1" style={{ color }}>{label}</span>
+                <span className="text-[9px] font-bold" style={{ color: color+'88' }}>{sub}</span>
               </button>
             ))}
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">预计工时 (h)</div>
-              <input type="number" step="0.5" value={wfHours} onChange={e=>setWfHours(e.target.value)} placeholder="e.g. 2.5" className="w-full text-[10px] border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none"/>
-            </div>
-            <div>
-              <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">实际工时 (h)</div>
-              <input type="number" step="0.5" value={wfActualH} onChange={e=>setWfActualH(e.target.value)} placeholder="实际花费" className="w-full text-[10px] border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none"/>
-            </div>
+        </div>
+
+        {/* 班次 SHIFT */}
+        <div className="rounded-xl p-3 border-2 bg-indigo-50 flex flex-col gap-2" style={{ borderColor: '#6366F133' }}>
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">班次停机 Shift</p>
+          <div className="flex gap-1.5 flex-1 items-center">
+            <button onClick={() => setAddModal(true)} className="flex-1 flex flex-col items-center justify-center rounded-lg py-2 hover:brightness-95 transition-all" style={{ backgroundColor:'#6366F122' }}>
+              <span className="text-lg font-black tabular-nums leading-none text-indigo-600">{fmtH(amMins)}</span>
+              <span className="text-[10px] font-black text-indigo-500 mt-1">早班</span>
+              <span className="text-[9px] font-bold text-indigo-300">Morning AM</span>
+            </button>
+            <button onClick={() => setAddModal(true)} className="flex-1 flex flex-col items-center justify-center rounded-lg py-2 hover:brightness-95 transition-all" style={{ backgroundColor:'#EC489922' }}>
+              <span className="text-lg font-black tabular-nums leading-none text-pink-600">{fmtH(pmMins)}</span>
+              <span className="text-[10px] font-black text-pink-500 mt-1">下午班</span>
+              <span className="text-[9px] font-bold text-pink-300">Afternoon PM</span>
+            </button>
           </div>
-          <div>
-            <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">备注</div>
-            <textarea value={wfNotes} onChange={e=>setWfNotes(e.target.value)} rows={2} className="w-full text-[10px] border border-slate-200 rounded-xl px-3 py-2 resize-none focus:outline-none"/>
-          </div>
-          <div>
-            <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">照片</div>
-            <div className="flex flex-wrap gap-2">
-              {wfPhotos.map((src,i)=>(
-                <div key={i} className="relative">
-                  <img src={src} className="w-16 h-16 rounded-lg object-cover cursor-pointer" onClick={()=>setWoLightbox(src)}/>
-                  <button onClick={()=>setWfPhotos(p=>p.filter((_,j)=>j!==i))} className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white text-[8px] flex items-center justify-center">×</button>
+        </div>
+      </div>
+
+      {/* ── Factory floor plan ───────────────────────────────── */}
+      {(() => {
+        const st = getMachineStatus;
+        const clr = (status: string): { bg: string; fg: string } => ({
+          run:   { bg: '#10b981', fg: '#fff' },
+          warn:  { bg: '#f59e0b', fg: '#fff' },
+          error: { bg: '#ef4444', fg: '#fff' },
+          idle:  { bg: '#cbd5e1', fg: '#64748b' },
+        }[status] ?? { bg: '#cbd5e1', fg: '#64748b' });
+
+        const Machine = ({ name, x, y, w, h, rotate }: { name:string;x:number;y:number;w:number;h:number;rotate?:boolean }) => {
+          const { bg, fg } = clr(st(name));
+          return (
+            <div
+              onClick={() => setStatusModal(name)}
+              style={{ position:'absolute', left:x, top:y, width:w, height:h, backgroundColor:bg, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 2px 4px rgba(0,0,0,.15)', cursor:'pointer' }}
+              title={`点击设置 ${name} 状态`}
+            >
+              <span style={{ color:fg, fontSize:11, fontWeight:900, writingMode: rotate ? 'vertical-rl' : undefined, transform: rotate ? 'rotate(180deg)' : undefined }}>{name}</span>
+            </div>
+          );
+        };
+
+        const Conv = ({ x, y, h, label }: { x:number;y:number;h:number;label?:string }) => {
+          const id = label ?? 'crane';
+          const { bg } = clr(st(id));
+          return (
+            <div onClick={() => setStatusModal(id)} title={`点击设置 ${id} 状态`}
+              style={{ position:'absolute', left:x, top:y, width:18, height:h, backgroundColor:bg, borderRadius:4, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 1px 3px rgba(0,0,0,.2)', cursor:'pointer' }}>
+              {label && <span style={{ color:'rgba(255,255,255,.85)', fontSize:7, fontWeight:700, writingMode:'vertical-rl', transform:'rotate(180deg)' }}>{label}</span>}
+            </div>
+          );
+        };
+
+        const Room = ({ name, x, y, w, h, bg='#f8fafc', border='#e2e8f0' }: { name:string;x:number;y:number;w:number;h:number;bg?:string;border?:string }) => (
+          <div style={{ position:'absolute', left:x, top:y, width:w, height:h, backgroundColor:bg, border:`1px solid ${border}`, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:700, color:'#64748b' }}>{name}</div>
+        );
+
+        const Forklift = ({ name, x, y }: { name:string;x:number;y:number }) => {
+          const { bg } = clr(st(name));
+          return (
+            <div onClick={() => setStatusModal(name)} title={`点击设置 ${name} 状态`}
+              style={{ position:'absolute', left:x, top:y, width:68, height:62, backgroundColor:bg, borderRadius:8, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2, boxShadow:'0 2px 4px rgba(0,0,0,.2)', cursor:'pointer' }}>
+              <Truck size={18} color="white" />
+              <span style={{ color:'white', fontSize:8, fontWeight:900 }}>{name}</span>
+            </div>
+          );
+        };
+
+
+        const Bundle = ({ x, y, w, h }: { x:number;y:number;w:number;h:number }) => (
+          <div style={{ position:'absolute', left:x, top:y, width:w, height:h, backgroundColor:'white', border:'1px solid #e2e8f0', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', fontSize:7, fontWeight:700, color:'#94a3b8' }}>BUNDLE<br/>AREA</div>
+        );
+
+        const Gate = ({ label, x, y }: { label:string;x:number;y:number }) => (
+          <div style={{ position:'absolute', left:x, top:y, fontSize:8, fontWeight:900, color:'#94a3b8', letterSpacing:1 }}>{label}</div>
+        );
+
+        const Sep = ({ y }: { y:number }) => (
+          <div style={{ position:'absolute', left:0, top:y, right:0, height:1, borderTop:'2px dashed #cbd5e1' }} />
+        );
+
+        const STATUS_OPTIONS = [
+          { status: 'run',   label: '正常运行',      sublabel: 'Running',     bg: '#10b981', icon: '✅' },
+          { status: 'error', label: '停机',          sublabel: 'Fault/Down',  bg: '#ef4444', icon: '🔴' },
+          { status: 'warn',  label: '维修保养',      sublabel: 'Maintenance', bg: '#f59e0b', icon: '🟡' },
+          { status: 'idle',  label: '无生产计划',    sublabel: 'No Plan',     bg: '#94a3b8', icon: '⬜' },
+        ];
+
+        return (
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden shrink-0 relative">
+            {/* Status picker modal */}
+            {statusModal && (
+              <div className="absolute inset-0 z-20 bg-black/30 flex items-center justify-center rounded-2xl" onClick={() => setStatusModal(null)}>
+                <div className="bg-white rounded-2xl shadow-2xl p-4 w-64" onClick={e => e.stopPropagation()}>
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">机器状态</p>
+                      <p className="text-[14px] font-black text-slate-800">{statusModal}</p>
+                    </div>
+                    <button onClick={() => setStatusModal(null)} className="text-slate-300 hover:text-slate-500"><X size={14}/></button>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {STATUS_OPTIONS.map(opt => {
+                      const current = st(statusModal) === opt.status;
+                      return (
+                        <button key={opt.status} onClick={() => setMachineStatus(statusModal, opt.status)}
+                          className={cn('flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all',
+                            current ? 'ring-2 ring-offset-1' : 'hover:bg-slate-50')}
+                          style={current ? { ringColor: opt.bg } : {}}>
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: opt.bg }}>
+                            <span className="text-white font-black text-[10px]">{current ? '✓' : ''}</span>
+                          </div>
+                          <div>
+                            <p className="text-[11px] font-black text-slate-800 leading-none">{opt.icon} {opt.label}</p>
+                            <p className="text-[9px] text-slate-400 mt-0.5">{opt.sublabel}</p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              ))}
-              <label className="w-16 h-16 rounded-lg border-2 border-dashed border-slate-200 flex items-center justify-center cursor-pointer hover:border-blue-400 text-slate-300 hover:text-blue-400 transition-colors">
-                <Plus size={20}/>
-                <input type="file" accept="image/*" className="hidden" onChange={async e=>{
-                  const f=e.target.files?.[0];if(!f)return;
-                  const url=await resizeImg(f);setWfPhotos(p=>[...p,url]);
-                }}/>
-              </label>
+              </div>
+            )}
+            <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
+              <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Factory Layout — 车间平面图 <span className="text-slate-300 font-normal">点击机器设置状态</span></span>
+              <div className="flex gap-3 text-[8px] text-slate-400">
+                <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-emerald-500"/>Running</span>
+                <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-500"/>Fault</span>
+                <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-amber-400"/>Maintenance</span>
+                <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-slate-300"/>No Plan</span>
+              </div>
+            </div>
+            <div className="overflow-x-auto" style={{height: 510}}>
+              <div style={{ position:'relative', width:1440, height:510, backgroundColor:'#f0f4ff' }}>
+
+                {/* ── Zone backgrounds ── */}
+                <div style={{ position:'absolute', left:0, top:0, right:0, height:205, backgroundColor:'#eff6ff' }} />
+                <div style={{ position:'absolute', left:0, top:210, right:0, height:205, backgroundColor:'#eff6ff' }} />
+                <div style={{ position:'absolute', left:0, top:420, right:0, height:90, backgroundColor:'#f8fafc' }} />
+
+                {/* ── Separators ── */}
+                <Sep y={206} />
+                <Sep y={416} />
+
+                {/* ═══════════ TOP ZONE: SL Lines ═══════════ */}
+
+                <Conv x={42}   y={22} h={165} label="C11" />
+                <Bundle x={70}  y={22} w={130} h={165} />
+                <Conv x={210}  y={22} h={165} label="C12" />
+                <Machine name="SL28"  x={238} y={22} w={220} h={145} />
+                <Conv x={468}  y={22} h={165} label="C13" />
+
+                <Conv x={548}  y={22} h={165} label="C14" />
+                <Bundle x={576} y={28} w={130} h={155} />
+                <Conv x={716}  y={22} h={165} label="C14" />
+
+                <Conv x={760}  y={22} h={165} label="C15" />
+                <Machine name="SL32"  x={788} y={22} w={295} h={145} />
+                <Forklift name="HYSTER" x={1098} y={22} />
+                <Forklift name="JCB"   x={1098} y={96} />
+                <Conv x={1176} y={22} h={165} label="C16" />
+                <Bundle x={1204} y={22} w={148} h={165} />
+                <Conv x={1362} y={22} h={165} label="C17" />
+
+                {/* ═══════════ MIDDLE ZONE: Production ═══════════ */}
+
+                <Machine name="FT-2"  x={18}  y={232} w={62} h={165} rotate />
+                <Conv    x={90}  y={232} h={165} label="D11" />
+                <Machine name="PL22" x={118}  y={236} w={210} h={155} />
+                <Conv    x={338} y={232} h={165} label="D22" />
+
+                <Conv    x={458} y={232} h={165} label="D23" />
+                <Machine name="FT-1"  x={486}  y={252} w={110} h={130} />
+                <Machine name="MST"   x={606}  y={252} w={120} h={130} />
+                <Conv    x={736} y={232} h={165} label="D22" />
+
+                <Machine name="Threading" x={786} y={252} w={95}  h={75} />
+                <Machine name="Robo"  x={892}  y={252} w={95}  h={75} />
+                <Machine name="SL300" x={892}  y={338} w={195} h={65} />
+                <Conv    x={1097} y={232} h={165} label="D33" />
+                <Bundle  x={1125} y={232} w={155} h={165} />
+                <Conv    x={1290} y={232} h={165} label="D44" />
+
+                {/* ═══════════ BOTTOM ZONE: Facilities ═══════════ */}
+                <Room name="WC"      x={62}  y={435} w={65}  h={45} />
+                <Room name="LOCKER"  x={136} y={435} w={80}  h={45} />
+                <Room name="LUNCH"   x={226} y={435} w={75}  h={45} />
+                <Forklift name="TOYOTA" x={368} y={428} />
+
+                <Room name="MEETING" x={552} y={435} w={92}  h={45} />
+                <Room name="OFFICE"  x={654} y={435} w={78}  h={45} />
+                <Room name="FITTING" x={742} y={435} w={78}  h={45} />
+
+                <Room name="WAREHOUSE / ACC STOCK" x={980} y={432} w={195} h={50} bg="#e0f2fe" border="#7dd3fc" />
+                <Forklift name="NISSAN" x={1188} y={428} />
+
+                {/* Gates */}
+                <Gate label="GATE 1" x={155} y={495} />
+                <Gate label="GATE 2" x={575} y={495} />
+                <Gate label="GATE 3" x={910} y={495} />
+                <Gate label="GATE 5" x={1350} y={495} />
+
+              </div>
+            </div>
+
+            {/* ── Machine Status ── */}
+            <div className="border-t border-slate-200">
+              <div className="flex items-center justify-between px-4 py-2 bg-slate-50">
+                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Machine Status — 机器状态</span>
+                <div className="flex gap-3 text-[8px] text-slate-400">
+                  {([["bg-emerald-500","Running"],["bg-amber-400","Restricted"],["bg-red-500","Down"],["bg-slate-300","No Plan"]] as string[][]).map(([c,l])=>(
+                    <span key={l} className="flex items-center gap-1"><span className={cn("w-2 h-2 rounded-full",c)}/>{l}</span>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-4 lg:grid-cols-8 divide-x divide-y divide-slate-100">
+                {allMachines.map(m => {
+                  const st = getMachineStatus(m.name);
+                  const recs = maintRecords.filter(r => r.machineName === m.name);
+                  const latest = recs[0];
+                  const monthDtH = recs.filter(r => { const d = new Date(r.date); return d.getFullYear()===msNow.getFullYear()&&d.getMonth()===msNow.getMonth(); }).reduce((s,r)=>s+(r.totalDowntime||0),0);
+                  const avail = shiftPlanH > 0 ? Math.max(0, Math.round((1 - monthDtH/shiftPlanH)*100)) : null;
+                  const supaStatus = latest ? ({ Running:"run", Restricted:"warn", Down:"error" }[latest.machineStatusAfter] ?? st) : st;
+                  const ds = machineStatuses[m.name] ?? supaStatus;
+                  const dCls: Record<string,string> = { run:"bg-emerald-500", warn:"bg-amber-400", error:"bg-red-500 animate-pulse", idle:"bg-slate-300" };
+                  const rClr = (rv: string) => ({ Fixed:"bg-emerald-100 text-emerald-700", Temporary:"bg-amber-100 text-amber-700", "Not Fixed":"bg-red-100 text-red-600", Observation:"bg-blue-100 text-blue-700" }[rv] ?? "bg-slate-100 text-slate-500");
+                  return (
+                    <div key={m.name} onClick={()=>setStatusModal(m.name)} className="flex flex-col gap-1.5 p-3 hover:bg-slate-50/60 cursor-pointer bg-white">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1"><Cpu size={11} className="text-slate-400 shrink-0"/><span className="text-[10px] font-black text-slate-800 truncate">{m.name}</span></div>
+                        <div className={cn("w-2 h-2 rounded-full shrink-0", dCls[ds]??"bg-slate-300")}/>
+                      </div>
+                      <div className={cn("text-[7px] font-bold", ds==="run"?"text-emerald-600":ds==="error"?"text-red-500":ds==="warn"?"text-amber-500":"text-slate-400")}>
+                        {ds==="run"?"Running":ds==="error"?"Down":ds==="warn"?"Restricted":"No Plan"}
+                      </div>
+                      {avail != null && <div><div className="flex justify-between items-baseline"><span className="text-[6px] text-slate-400">AVAIL</span><span className={cn("text-[11px] font-black tabular-nums", avail>=90?"text-emerald-600":avail>=75?"text-amber-500":"text-red-500")}>{avail}%</span></div><div className="h-1 bg-slate-100 rounded-full overflow-hidden"><div className={cn("h-full", avail>=90?"bg-emerald-500":avail>=75?"bg-amber-400":"bg-red-500")} style={{width:`${avail}%`}}/></div></div>}
+                      {latest && <div className="text-[6px] text-slate-400">{latest.date}{latest.repairResult&&<span className={cn("ml-1 px-1 rounded text-[6px] font-bold",rClr(latest.repairResult))}>{latest.repairResult}</span>}{monthDtH>0&&<span className="ml-1 text-red-400 font-bold">↓{monthDtH.toFixed(1)}h</span>}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ── Maintenance Logs ── */}
+            <div className="border-t border-slate-200">
+              <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 flex-wrap">
+                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Maintenance Logs — 维修记录</span>
+                <div className="flex gap-1 flex-wrap ml-1">
+                  {(["all",...allMachines.map(m=>m.name)] as string[]).map(name=>(
+                    <button key={name} onClick={()=>setWoMachine(name)} className={cn("text-[8px] px-2 py-0.5 rounded-full font-bold transition-colors", woMachine===name?"bg-slate-800 text-white":"bg-slate-100 text-slate-500 hover:bg-slate-200")}>{name==="all"?"全部":name}</button>
+                  ))}
+                </div>
+                <span className="text-[8px] text-slate-300 ml-auto">{maintRecords.filter(r=>woMachine==="all"||r.machineName===woMachine).length} 条</span>
+              </div>
+              {maintRecords.length > 0 ? (
+                <div className="overflow-x-auto" style={{maxHeight:300,overflowY:"auto"}}>
+                  <table className="w-full text-[9px]">
+                    <thead style={{position:"sticky",top:0,zIndex:1}}><tr className="border-b border-slate-100 bg-slate-50">{["日期","班次","机器","故障区域","类型","难度","停机(h)","维修结果","机器状态","技术员"].map(h=><th key={h} className="text-left px-3 py-2 font-bold text-slate-400 whitespace-nowrap">{h}</th>)}</tr></thead>
+                    <tbody>{maintRecords.filter(r=>woMachine==="all"||r.machineName===woMachine).slice(0,100).map((r,i)=>(
+                      <tr key={r.id} className={cn("border-t border-slate-50 hover:bg-slate-50/60",i%2===1?"bg-slate-50/20":"")}>
+                        <td className="px-3 py-1.5 font-bold text-slate-700 whitespace-nowrap">{r.date}</td>
+                        <td className="px-3 py-1.5"><span className={cn("px-1.5 py-0.5 rounded-full text-[7px] font-black",r.shift==="AM"?"bg-blue-100 text-blue-700":"bg-amber-100 text-amber-700")}>{r.shift||"—"}</span></td>
+                        <td className="px-3 py-1.5 font-black text-slate-800 whitespace-nowrap">{r.machineName}</td>
+                        <td className="px-3 py-1.5 text-slate-600 max-w-[120px] truncate">{r.faultArea||"—"}</td>
+                        <td className="px-3 py-1.5 text-slate-500 whitespace-nowrap">{r.maintenanceType||"—"}</td>
+                        <td className="px-3 py-1.5">{r.difficulty?<span className={cn("font-black",r.difficulty<=2?"text-emerald-600":r.difficulty<=3?"text-amber-500":"text-red-500")}>L{r.difficulty}</span>:"—"}</td>
+                        <td className={cn("px-3 py-1.5 font-black tabular-nums",r.totalDowntime>0?"text-red-500":"text-slate-400")}>{r.totalDowntime>0?r.totalDowntime.toFixed(1):"—"}</td>
+                        <td className="px-3 py-1.5">{r.repairResult?<span className={cn("px-1.5 py-0.5 rounded text-[7px] font-bold",({Fixed:"bg-emerald-100 text-emerald-700",Temporary:"bg-amber-100 text-amber-700","Not Fixed":"bg-red-100 text-red-600",Observation:"bg-blue-100 text-blue-700"} as Record<string,string>)[r.repairResult]??"bg-slate-100 text-slate-500")}>{r.repairResult}</span>:"—"}</td>
+                        <td className="px-3 py-1.5">{r.machineStatusAfter?<span className={cn("px-1.5 py-0.5 rounded text-[7px] font-bold",r.machineStatusAfter==="Running"?"bg-emerald-100 text-emerald-700":r.machineStatusAfter==="Restricted"?"bg-amber-100 text-amber-700":"bg-red-100 text-red-600")}>{r.machineStatusAfter}</span>:"—"}</td>
+                        <td className="px-3 py-1.5 text-slate-500 whitespace-nowrap">{r.technician||"—"}</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-slate-300 gap-2 bg-white">
+                  <History size={20}/><span className="text-[9px] font-bold">暂无记录 — 点击「同步保养系统」加载</span>
+                </div>
+              )}
             </div>
           </div>
-          <button onClick={saveWoForm} className="w-full py-2.5 rounded-xl bg-slate-800 text-white text-[10px] font-black hover:bg-slate-700 transition-colors">
-            {woEdit?'保存修改':'创建工单'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+        );
+      })()}
 
-  // ── Return ─────────────────────────────────────────────────────────────
-  return (
-    <SectionWrapper title="Machine Status — 机器状态" icon={Cpu} color={color}>
-      {/* Top bar: sync + add */}
-      <div className="flex items-center gap-3 text-[9px] shrink-0 flex-wrap">
-        <button onClick={syncFromMaintenance} disabled={syncStatus==='syncing'}
-          className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all',
-            syncStatus==='syncing'?'bg-blue-50 text-blue-400':
-            syncStatus==='ok'?'bg-emerald-50 text-emerald-600 hover:bg-emerald-100':
-            syncStatus==='err'?'bg-red-50 text-red-500 hover:bg-red-100':
-            'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200')}>
-          <RefreshCw size={11} className={syncStatus==='syncing'?'animate-spin':''}/>
-          {syncStatus==='syncing'?'同步中...':'同步保养系统'}
-        </button>
-        {lastSync&&<span className="text-slate-400">上次同步 {lastSync} · {maintRecords.length} 条记录</span>}
-        {syncStatus==='ok'&&<span className="text-emerald-500 font-bold">✓ 已连接 Pro-Maintenance</span>}
-        {syncStatus==='err'&&<span className="text-red-400">✗ 连接失败</span>}
-        <div className="ml-auto flex items-center gap-2">
-          <button onClick={()=>{setAddForm({name:'',category:'PRODUCTION',section:'',isNewSection:false});setIsAddModalOpen(true);}}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg font-black text-[9px] uppercase tracking-widest hover:bg-blue-700 transition-all shadow-sm">
-            <Plus size={11}/> 添加设备
-          </button>
-          <button onClick={()=>openAddWo()}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 text-white rounded-lg font-black text-[9px] uppercase tracking-widest hover:bg-slate-900 transition-all shadow-sm">
-            <Plus size={11}/> 工单
-          </button>
-        </div>
-      </div>
+      {/* ══ (old Machine Status block - now inside floor plan card) ══ */}
+      {(() => {
+        const dotCls: Record<string,string> = { run:'bg-emerald-500', warn:'bg-amber-400', error:'bg-red-500 animate-pulse', idle:'bg-slate-300' };
+        const resClr = (r: string) => ({ Fixed:'bg-emerald-100 text-emerald-700', Temporary:'bg-amber-100 text-amber-700', 'Not Fixed':'bg-red-100 text-red-600', Observation:'bg-blue-100 text-blue-700' }[r] ?? 'bg-slate-100 text-slate-500');
 
-      {/* Tab navigation */}
-      <div className="bg-white p-1.5 rounded-xl inline-flex shadow-sm border border-slate-200 overflow-x-auto shrink-0 no-scrollbar">
-        {([
-          {id:'SUMMARY',label:'全部概览 (Overview)',Icon:LayoutGrid,activeClr:'bg-slate-900'},
-          {id:'PRODUCTION',label:'生产设备',Icon:Monitor,activeClr:'bg-blue-600'},
-          {id:'FORKLIFTS',label:'叉车',Icon:Truck,activeClr:'bg-orange-600'},
-          {id:'CRANES',label:'行车',Icon:Hammer,activeClr:'bg-indigo-600'},
-          {id:'OTHERS',label:'其他',Icon:Cog,activeClr:'bg-teal-600'},
-        ] as const).map(t=>(
-          <button key={t.id} onClick={()=>setActiveTab(t.id as any)}
-            className={cn('flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap',
-              activeTab===t.id?`${t.activeClr} text-white shadow-lg`:'text-slate-400 hover:bg-slate-50')}>
-            <t.Icon className="w-3.5 h-3.5"/> {t.label}
-          </button>
-        ))}
-      </div>
+        return (
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
+              <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Machine Status — 机器状态</span>
+              <div className="flex gap-3 text-[8px] text-slate-400">
+                {[['bg-emerald-500','Running'],['bg-amber-400','Restricted'],['bg-red-500','Down'],['bg-slate-300','No Plan']].map(([c,l])=>(
+                  <span key={l} className="flex items-center gap-1"><span className={cn('w-2 h-2 rounded-full',c)}/>{l}</span>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 divide-x divide-y divide-slate-100">
+              {allMachines.map(m => {
+                const st = getMachineStatus(m.name);
+                const recs = maintRecords.filter(r => r.machineName === m.name);
+                const latest = recs[0];
+                const monthDtH = recs.filter(r => { const d = new Date(r.date); return d.getFullYear()===msNow.getFullYear()&&d.getMonth()===msNow.getMonth(); }).reduce((s,r)=>s+(r.totalDowntime||0),0);
+                const avail = shiftPlanH > 0 ? Math.max(0, Math.round((1 - monthDtH/shiftPlanH)*100)) : null;
+                const supaStatus = latest ? ({ Running:'run', Restricted:'warn', Down:'error' }[latest.machineStatusAfter] ?? st) : st;
+                const ds = machineStatuses[m.name] ?? supaStatus;
+                return (
+                  <div key={m.name} onClick={()=>setStatusModal(m.name)}
+                    className="flex flex-col gap-1.5 p-3 hover:bg-slate-50/60 cursor-pointer">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1"><Cpu size={11} className="text-slate-400"/><span className="text-[10px] font-black text-slate-800 truncate">{m.name}</span></div>
+                      <div className={cn('w-2 h-2 rounded-full shrink-0', dotCls[ds]??'bg-slate-300')}/>
+                    </div>
+                    <div className={cn('text-[7px] font-bold', ds==='run'?'text-emerald-600':ds==='error'?'text-red-500':ds==='warn'?'text-amber-500':'text-slate-400')}>
+                      {ds==='run'?'Running':ds==='error'?'Down':ds==='warn'?'Restricted':'No Plan'}
+                    </div>
+                    {avail != null && (
+                      <div>
+                        <div className="flex justify-between items-baseline">
+                          <span className="text-[6px] text-slate-400">AVAIL</span>
+                          <span className={cn('text-[11px] font-black tabular-nums', avail>=90?'text-emerald-600':avail>=75?'text-amber-500':'text-red-500')}>{avail}%</span>
+                        </div>
+                        <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+                          <div className={cn('h-full', avail>=90?'bg-emerald-500':avail>=75?'bg-amber-400':'bg-red-500')} style={{width:`${avail}%`}}/>
+                        </div>
+                      </div>
+                    )}
+                    {latest && (
+                      <div className="text-[6px] text-slate-400 leading-relaxed">
+                        {latest.date}
+                        {latest.repairResult && <span className={cn('ml-1 px-1 py-0.5 rounded text-[6px] font-bold', resClr(latest.repairResult))}>{latest.repairResult}</span>}
+                        {monthDtH > 0 && <span className="ml-1 text-red-400 font-bold">↓{monthDtH.toFixed(1)}h</span>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
-      {/* Machine grid */}
-      <div className="flex-1 overflow-y-auto min-h-0">
-        {renderList()}
-      </div>
-
-      {/* Maintenance Logs Table */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden shrink-0">
+      {/* ══ Maintenance Logs ═══════════════════════════════════════════ */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100 flex-wrap">
-          <History size={14} className="text-slate-400"/>
           <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Maintenance Logs — 维修记录</span>
-          <div className="flex gap-1 flex-wrap ml-2">
-            {(['all',...[...new Set<string>(maintRecords.map(r=>r.machineName))].sort()] as string[]).map(name=>(
+          <div className="flex gap-1 flex-wrap">
+            {(['all', ...machines.map(m=>m.name), ...supabaseMachines.filter(m=>!machines.some(hm=>hm.name===m.name)).map(m=>m.name)] as string[]).map(name => (
               <button key={name} onClick={()=>setWoMachine(name)}
                 className={cn('text-[8px] px-2 py-0.5 rounded-full font-bold transition-colors',
-                  woMachine===name?'bg-slate-800 text-white':'bg-slate-100 text-slate-500 hover:bg-slate-200')}>
+                  woMachine===name ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200')}>
                 {name==='all'?'全部':name}
               </button>
             ))}
           </div>
           <span className="text-[8px] text-slate-300 ml-auto">{maintRecords.filter(r=>woMachine==='all'||r.machineName===woMachine).length} 条</span>
         </div>
-        {maintRecords.length>0?(
-          <div className="overflow-x-auto max-h-72 overflow-y-auto">
+        {maintRecords.length > 0 ? (
+          <div className="overflow-x-auto max-h-96 overflow-y-auto">
             <table className="w-full text-[9px]">
               <thead className="sticky top-0">
                 <tr className="border-b border-slate-100 bg-slate-50">
@@ -7050,109 +6951,268 @@ const MachineSection: React.FC<SectionProps> = ({ color }) => {
               </thead>
               <tbody>
                 {maintRecords.filter(r=>woMachine==='all'||r.machineName===woMachine).slice(0,100).map((r,i)=>(
-                  <tr key={r.id} className={cn('border-t border-slate-50 hover:bg-slate-50/60',i%2===1?'bg-slate-50/20':'')}>
+                  <tr key={r.id} className={cn('border-t border-slate-50 hover:bg-slate-50/60', i%2===1?'bg-slate-50/20':'')}>
                     <td className="px-3 py-1.5 font-bold text-slate-700 whitespace-nowrap">{r.date}</td>
-                    <td className="px-3 py-1.5"><span className={cn('px-1.5 py-0.5 rounded-full text-[7px] font-black',r.shift==='AM'?'bg-blue-100 text-blue-700':'bg-amber-100 text-amber-700')}>{r.shift||'—'}</span></td>
+                    <td className="px-3 py-1.5"><span className={cn('px-1.5 py-0.5 rounded-full text-[7px] font-black', r.shift==='AM'?'bg-blue-100 text-blue-700':'bg-amber-100 text-amber-700')}>{r.shift||'—'}</span></td>
                     <td className="px-3 py-1.5 font-black text-slate-800 whitespace-nowrap">{r.machineName}</td>
                     <td className="px-3 py-1.5 text-slate-600 max-w-[120px] truncate">{r.faultArea||'—'}</td>
                     <td className="px-3 py-1.5 text-slate-500 whitespace-nowrap">{r.maintenanceType||'—'}</td>
                     <td className="px-3 py-1.5">{r.difficulty?<span className={cn('font-black',r.difficulty<=2?'text-emerald-600':r.difficulty<=3?'text-amber-500':'text-red-500')}>L{r.difficulty}</span>:'—'}</td>
                     <td className={cn('px-3 py-1.5 font-black tabular-nums',r.totalDowntime>0?'text-red-500':'text-slate-400')}>{r.totalDowntime>0?r.totalDowntime.toFixed(1):'—'}</td>
                     <td className="px-3 py-1.5">{r.repairResult?<span className={cn('px-1.5 py-0.5 rounded text-[7px] font-bold',{Fixed:'bg-emerald-100 text-emerald-700',Temporary:'bg-amber-100 text-amber-700','Not Fixed':'bg-red-100 text-red-600',Observation:'bg-blue-100 text-blue-700'}[r.repairResult]??'bg-slate-100 text-slate-500')}>{r.repairResult}</span>:'—'}</td>
-                    <td className="px-3 py-1.5">{r.machineStatusAfter?<span className={cn('px-1.5 py-0.5 rounded text-[7px] font-bold',r.machineStatusAfter.includes('Down')?'bg-red-100 text-red-600':r.machineStatusAfter.includes('Restricted')?'bg-amber-100 text-amber-700':'bg-emerald-100 text-emerald-700')}>{r.machineStatusAfter.replace(' (正常运行)','').replace(' (降速/带病运行)','').replace(' (停机)','')}</span>:'—'}</td>
+                    <td className="px-3 py-1.5">{r.machineStatusAfter?<span className={cn('px-1.5 py-0.5 rounded text-[7px] font-bold',r.machineStatusAfter==='Running'?'bg-emerald-100 text-emerald-700':r.machineStatusAfter==='Restricted'?'bg-amber-100 text-amber-700':'bg-red-100 text-red-600')}>{r.machineStatusAfter}</span>:'—'}</td>
                     <td className="px-3 py-1.5 text-slate-500 whitespace-nowrap">{r.technician||'—'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        ):(
-          <div className="flex flex-col items-center justify-center py-10 text-slate-300 gap-2">
+        ) : (
+          <div className="flex flex-col items-center justify-center py-12 text-slate-300 gap-2">
             <History size={24}/><span className="text-[9px] font-bold">暂无记录 — 点击「同步保养系统」加载</span>
           </div>
         )}
       </div>
 
-      {/* Work Orders */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden shrink-0">
-        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100">
-          <ClipboardList size={14} className="text-slate-400"/>
-          <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">维修工单 Work Orders</span>
-          <button onClick={()=>openAddWo()} className="ml-auto flex items-center gap-1 px-2.5 py-1 bg-slate-800 text-white text-[8px] font-black rounded-lg uppercase tracking-widest hover:bg-slate-900">
-            <Plus size={10}/> 新建
-          </button>
-        </div>
-        {workOrders.length>0?(
-          <div className="flex flex-col gap-0 max-h-64 overflow-y-auto divide-y divide-slate-50">
-            {workOrders.map(wo=>(
-              <div key={wo.id} className="flex items-start gap-3 px-4 py-2.5 hover:bg-slate-50/60 group">
-                <div className={cn('w-2 h-2 rounded-full mt-1 shrink-0',WO_PRIORITY_CLR[wo.priority])}/>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[10px] font-black text-slate-800">{wo.machine}</span>
-                    <span className={cn('text-[7px] font-black px-1.5 py-0.5 rounded',WO_STATUS_CLR[wo.status])}>{WO_STATUS_TXT[wo.status]}</span>
-                    <span className="text-[8px] text-slate-400">{wo.date}</span>
-                    {wo.fitter&&<span className="text-[8px] text-slate-400">· {wo.fitter}</span>}
-                  </div>
-                  <p className="text-[9px] text-slate-600 mt-0.5 line-clamp-1">{wo.description}</p>
-                  <div className="flex gap-1.5 flex-wrap mt-1">
-                    <span className={cn('px-1.5 py-0.5 rounded text-[7px] font-bold',wo.isMachineFixed?'bg-emerald-100 text-emerald-700':'bg-slate-100 text-slate-500')}>Fixed? {wo.isMachineFixed?'Yes':'No'}</span>
-                    <span className={cn('px-1.5 py-0.5 rounded text-[7px] font-bold',wo.isMachineWorking?'bg-blue-100 text-blue-700':'bg-red-100 text-red-600')}>Working? {wo.isMachineWorking?'Yes':'No'}</span>
-                  </div>
-                  {wo.photos.length>0&&(
-                    <div className="flex gap-1 mt-1">
-                      {wo.photos.map((src,i)=>(
-                        <img key={i} src={src} className="w-10 h-10 rounded object-cover cursor-pointer hover:opacity-90" onClick={()=>setWoLightbox(src)}/>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                  <button onClick={()=>openEditWo(wo)} className="p-1 text-slate-400 hover:text-blue-600"><Edit2 size={12}/></button>
-                  <button onClick={()=>saveWorkOrders(workOrders.filter(w=>w.id!==wo.id))} className="p-1 text-slate-400 hover:text-red-500"><Trash2 size={12}/></button>
-                </div>
-              </div>
-            ))}
-          </div>
-        ):(
-          <div className="flex flex-col items-center justify-center py-10 text-slate-300 gap-2">
-            <ClipboardList size={24}/><span className="text-[9px] font-bold">暂无工单 — 点击「新建」创建工单</span>
-          </div>
-        )}
-      </div>
-
-      {/* Modals */}
-      {selectedMachine&&<MachineDetailModal/>}
-      {isAddModalOpen&&<AddMachineModal/>}
-      {isEditModalOpen&&<EditMachineModal/>}
-      {woModal&&<WorkOrderModal/>}
-      {isPlanModalOpen&&(
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl p-6 w-80 shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-black text-slate-800">记录计划停机</h3>
-              <button onClick={()=>setIsPlanModalOpen(false)}><X size={18} className="text-slate-400"/></button>
-            </div>
-            <p className="text-xs text-slate-500">请在 Pro-Maintenance 系统中记录计划停机（Non-Production）</p>
-            <button onClick={()=>setIsPlanModalOpen(false)} className="mt-4 w-full py-2 bg-slate-800 text-white rounded-xl text-xs font-black">关闭</button>
-          </div>
-        </div>
-      )}
-      {woLightbox&&(
+      {/* ── 4.3.3 维修工单管理 Work Order Tracker ─────────────────── */}
+      {woLightbox && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={()=>setWoLightbox(null)}>
-          <img src={woLightbox} className="max-w-full max-h-full rounded-2xl object-contain"/>
+          <img src={woLightbox} className="max-w-full max-h-full rounded-2xl object-contain" />
           <button onClick={()=>setWoLightbox(null)} className="absolute top-4 right-4 text-white bg-black/40 rounded-full p-1.5"><X size={18}/></button>
         </div>
       )}
-      {previewImage&&(
-        <div className="fixed inset-0 z-[600] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 cursor-zoom-out" onClick={()=>setPreviewImage(null)}>
-          <img src={previewImage} className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl animate-in zoom-in-95 duration-500"/>
-          <button onClick={()=>setPreviewImage(null)} className="absolute top-4 right-4 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-all"><X className="w-8 h-8"/></button>
+
+      {/* Work order add/edit modal */}
+      {woModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={()=>setWoModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-[520px] max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <h3 className="text-sm font-black text-slate-800">{woEdit ? '编辑工单' : '新建工单'}</h3>
+              <button onClick={()=>setWoModal(false)} className="text-slate-300 hover:text-slate-500"><X size={16}/></button>
+            </div>
+            <div className="p-5 flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">机器</div>
+                  <select value={wfMachine} onChange={e=>setWfMachine(e.target.value)} className="w-full text-[10px] border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-blue-400">
+                    {machines.map(m=><option key={m.name}>{m.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">优先级</div>
+                  <select value={wfPriority} onChange={e=>setWfPriority(e.target.value as WorkOrder['priority'])} className="w-full text-[10px] border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-blue-400">
+                    <option value="urgent">紧急 Urgent</option>
+                    <option value="high">高 High</option>
+                    <option value="medium">中 Medium</option>
+                    <option value="low">低 Low</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">故障描述</div>
+                <textarea value={wfDesc} onChange={e=>setWfDesc(e.target.value)} rows={3} placeholder="描述故障现象和维修内容..."
+                  className="w-full text-[10px] border border-slate-200 rounded-xl px-3 py-2 resize-none focus:outline-none focus:border-blue-400" />
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">状态</div>
+                  <select value={wfStatus} onChange={e=>setWfStatus(e.target.value as WorkOrder['status'])} className="w-full text-[10px] border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none">
+                    <option value="pending">待处理</option>
+                    <option value="in_progress">进行中</option>
+                    <option value="completed">已完成</option>
+                  </select>
+                </div>
+                <div>
+                  <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">Fitter</div>
+                  <input value={wfFitter} onChange={e=>setWfFitter(e.target.value)} placeholder="姓名" className="w-full text-[10px] border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none" />
+                </div>
+                <div>
+                  <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">日期</div>
+                  <input type="date" value={wfDate} onChange={e=>setWfDate(e.target.value)} className="w-full text-[10px] border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none" />
+                </div>
+              </div>
+              {/* FMS-style toggles */}
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { label: 'Is Machine Fixed?', val: wfFixed,   set: setWfFixed   },
+                  { label: 'Is Machine Working?',val: wfWorking, set: setWfWorking },
+                  { label: 'Is Planned Downtime?',val: wfPlanned,set: setWfPlanned },
+                ] as const).map(({ label, val, set }) => (
+                  <button key={label} onClick={() => (set as (v: boolean) => void)(!val)}
+                    className={cn('flex flex-col items-center gap-1 py-2 rounded-xl border-2 text-[8px] font-bold transition-colors',
+                      val ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-400')}>
+                    <span className="text-[14px]">{val ? '✓' : '✗'}</span>
+                    <span className="text-center leading-tight">{label}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">预计工时 (h)</div>
+                  <input type="number" value={wfHours} onChange={e=>setWfHours(e.target.value)} placeholder="2" className="w-full text-[10px] border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none" />
+                </div>
+                <div>
+                  <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">实际工时 (h)</div>
+                  <input type="number" value={wfActualH} onChange={e=>setWfActualH(e.target.value)} placeholder="3" className="w-full text-[10px] border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none" />
+                </div>
+              </div>
+              <div>
+                <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">备注</div>
+                <input value={wfNotes} onChange={e=>setWfNotes(e.target.value)} placeholder="备注（可选）" className="w-full text-[10px] border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none" />
+              </div>
+              {/* Photos */}
+              <div>
+                <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">工单照片 / FMS截图</div>
+                <div className="flex flex-wrap gap-1.5 mb-1.5">
+                  {wfPhotos.map((src, i) => (
+                    <div key={i} className="relative">
+                      <img src={src} className="w-16 h-16 rounded-lg object-cover cursor-pointer hover:opacity-90" onClick={()=>setWoLightbox(src)} />
+                      <button onClick={()=>setWfPhotos(p=>p.filter((_,j)=>j!==i))} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center"><X size={8}/></button>
+                    </div>
+                  ))}
+                  <label className="w-16 h-16 rounded-lg border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-[7px] text-slate-400 cursor-pointer hover:border-blue-300 hover:text-blue-400 gap-0.5">
+                    <Camera size={12}/><span>+ 上传</span>
+                    <input type="file" accept="image/*" multiple className="hidden"
+                      onChange={async e => {
+                        const files = Array.from(e.target.files ?? []);
+                        const b64s = await Promise.all(files.map(resizeWoImg));
+                        setWfPhotos(p => [...p, ...b64s]);
+                        e.target.value = '';
+                      }} />
+                  </label>
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                {woEdit && <button onClick={()=>{deleteWo(woEdit.id);setWoModal(false);}} className="px-3 py-2 text-[10px] font-bold text-red-500 border border-red-200 rounded-xl hover:bg-red-50">删除</button>}
+                <div className="flex-1"/>
+                <button onClick={()=>setWoModal(false)} className="px-4 py-2 text-[10px] font-bold text-slate-400 border border-slate-200 rounded-xl hover:bg-slate-50">取消</button>
+                <button onClick={saveWoForm} className="px-5 py-2 bg-slate-800 text-white text-[10px] font-black rounded-xl hover:bg-slate-700">保存</button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
+
+      {/* Work order tracker panel */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+          <div>
+            <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">4.3.3 iPad 系统维修工单完成情况  Work Order Tracker</span>
+            {(() => {
+              const total = workOrders.length;
+              const done  = workOrders.filter(w => w.status === 'completed').length;
+              const pct   = total > 0 ? Math.round(done/total*100) : 0;
+              return total > 0 ? (
+                <div className="flex items-center gap-3 mt-0.5">
+                  <span className={cn('text-[11px] font-black tabular-nums', pct>=80?'text-emerald-600':pct>=60?'text-amber-500':'text-red-500')}>{pct}%</span>
+                  <span className="text-[9px] text-slate-400">完成 {done}/{total} 张  待完成 {total-done} 张</span>
+                </div>
+              ) : null;
+            })()}
+          </div>
+          <button onClick={()=>openAddWo()} className="flex items-center gap-1.5 text-[9px] px-3 py-1.5 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-700 transition-colors">
+            <Plus size={10}/> 新建工单
+          </button>
+        </div>
+
+        <div className="flex" style={{ minHeight: 340 }}>
+          {/* Left: machine list */}
+          <div className="w-36 shrink-0 border-r border-slate-100 flex flex-col">
+            <button onClick={()=>setWoMachine('all')}
+              className={cn('px-3 py-2 text-left text-[9px] font-bold border-b border-slate-50 transition-colors',
+                woMachine==='all' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-50')}>
+              全部机器 ({workOrders.length})
+            </button>
+            {machines.map(m => {
+              const mWo   = workOrders.filter(w => w.machine === m.name);
+              const mDone = mWo.filter(w => w.status === 'completed').length;
+              return (
+                <button key={m.name} onClick={()=>setWoMachine(m.name)}
+                  className={cn('px-3 py-2 text-left border-b border-slate-50 transition-colors',
+                    woMachine===m.name ? 'bg-slate-100 font-bold text-slate-800' : 'text-slate-500 hover:bg-slate-50')}>
+                  <div className="text-[10px] font-bold">{m.name}</div>
+                  {mWo.length > 0
+                    ? <div className={cn('text-[8px]', mDone===mWo.length?'text-emerald-500':'text-amber-500')}>完成 {mDone}/{mWo.length}</div>
+                    : <div className="text-[8px] text-slate-300">无工单</div>}
+                </button>
+              );
+            })}
+            <button onClick={()=>openAddWo(woMachine !== 'all' ? woMachine : undefined)}
+              className="mt-auto px-3 py-2 text-[8px] text-blue-500 font-bold hover:bg-blue-50 border-t border-slate-100 flex items-center gap-1">
+              <Plus size={9}/> 为此机器添加
+            </button>
+          </div>
+
+          {/* Right: work order list */}
+          <div className="flex-1 min-w-0 overflow-y-auto p-3 flex flex-col gap-2">
+            {(() => {
+              const filtered = workOrders.filter(w => woMachine === 'all' || w.machine === woMachine)
+                .sort((a, b) => {
+                  const pOrd = { urgent:0, high:1, medium:2, low:3 };
+                  const sOrd = { pending:0, in_progress:1, completed:2 };
+                  return (sOrd[a.status] - sOrd[b.status]) || (pOrd[a.priority] - pOrd[b.priority]);
+                });
+              if (!filtered.length) return (
+                <div className="flex flex-col items-center justify-center h-40 text-slate-300 gap-2">
+                  <ClipboardList size={28}/>
+                  <span className="text-[10px] font-bold">暂无工单 — 点击「新建工单」添加</span>
+                </div>
+              );
+              return filtered.map(wo => (
+                <div key={wo.id} className={cn('border rounded-xl p-3 flex flex-col gap-2 hover:shadow-sm transition-shadow cursor-pointer',
+                  wo.status==='completed' ? 'border-emerald-100 bg-emerald-50/30' :
+                  wo.status==='in_progress'? 'border-blue-100 bg-blue-50/20' : 'border-slate-100 bg-white')}
+                  onClick={()=>openEditWo(wo)}>
+                  <div className="flex items-start gap-2">
+                    {/* Priority dot */}
+                    <div className={cn('w-2 h-2 rounded-full mt-1.5 shrink-0', PRIORITY_CLR[wo.priority])} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] font-black text-slate-800">{wo.machine}</span>
+                        <span className={cn('text-[7px] font-black px-1.5 py-0.5 rounded-full', STATUS_CLR[wo.status])}>{STATUS_TXT[wo.status]}</span>
+                        <span className="text-[7px] text-slate-400">{wo.date}</span>
+                        {wo.fitter && <span className="text-[7px] text-slate-400">Fitter: {wo.fitter}</span>}
+                      </div>
+                      <p className="text-[10px] text-slate-700 mt-0.5 leading-relaxed">{wo.description}</p>
+                    </div>
+                  </div>
+                  {/* FMS-style status flags */}
+                  <div className="flex gap-2 text-[8px]">
+                    <span className={cn('px-1.5 py-0.5 rounded font-bold', wo.isMachineFixed?'bg-emerald-100 text-emerald-700':'bg-red-100 text-red-600')}>
+                      Is Machine Fixed? {wo.isMachineFixed ? 'Yes':'No'}
+                    </span>
+                    <span className={cn('px-1.5 py-0.5 rounded font-bold', wo.isMachineWorking?'bg-emerald-100 text-emerald-700':'bg-red-100 text-red-600')}>
+                      Is Machine Working? {wo.isMachineWorking ? 'Yes':'No'}
+                    </span>
+                    <span className={cn('px-1.5 py-0.5 rounded font-bold', wo.isPlannedDowntime?'bg-blue-100 text-blue-700':'bg-slate-100 text-slate-500')}>
+                      Is Planned Downtime? {wo.isPlannedDowntime ? 'Yes':'No'}
+                    </span>
+                  </div>
+                  {/* Photos */}
+                  {wo.photos.length > 0 && (
+                    <div className="flex gap-1.5 flex-wrap">
+                      {wo.photos.map((src,i)=>(
+                        <img key={i} src={src} className="w-14 h-14 rounded-lg object-cover cursor-pointer hover:opacity-90"
+                          onClick={e=>{e.stopPropagation();setWoLightbox(src);}} />
+                      ))}
+                    </div>
+                  )}
+                  {wo.notes && <p className="text-[8px] text-slate-400 italic">{wo.notes}</p>}
+                  {(wo.estimatedHours || wo.actualHours) && (
+                    <div className="text-[8px] text-slate-400">
+                      {wo.estimatedHours ? `预计 ${wo.estimatedHours}h` : ''}{wo.estimatedHours && wo.actualHours ? ' · ' : ''}{wo.actualHours ? `实际 ${wo.actualHours}h` : ''}
+                    </div>
+                  )}
+                </div>
+              ));
+            })()}
+          </div>
+        </div>
+      </div>
     </SectionWrapper>
   );
 };
+
 
 
 // ---- Capacity & Cost Section ----
