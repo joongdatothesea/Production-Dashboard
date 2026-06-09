@@ -6276,14 +6276,15 @@ const MachineSection: React.FC<SectionProps> = ({ color }) => {
   const syncFromMaintenance = async () => {
     setSyncStatus('syncing');
     try {
-      const { fetchMaintenanceRecords, fetchMachines } = await import('./lib/maintenance-supabase');
-      // Fetch all records (no date filter) to get full machine list & history
-      const [recs, machineList] = await Promise.all([
+      const { fetchMaintenanceRecords, fetchMachines, fetchSystemConfig } = await import('./lib/maintenance-supabase');
+      const [recs, machineList, sysConfig] = await Promise.all([
         fetchMaintenanceRecords(),
         fetchMachines(),
+        fetchSystemConfig(),
       ]);
       setMaintRecords(recs);
       if (machineList.length > 0) setSupabaseMachines(machineList);
+      if (Object.keys(sysConfig).length > 0) setMachineProConfig(sysConfig);
       setLastSync(new Date().toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit' }));
       setSyncStatus('ok');
     } catch { setSyncStatus('err'); }

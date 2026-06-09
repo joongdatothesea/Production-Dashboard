@@ -158,6 +158,15 @@ export const fetchPMLogs = async (machineName: string): Promise<PMLog[]> => {
   }));
 };
 
+/** Fetch systemConfig (machine subsystem definitions) from app_configs table */
+export const fetchSystemConfig = async (): Promise<Record<string, Record<string, string[]>>> => {
+  const client = getClient();
+  const { data, error } = await (client as any).from('app_configs').select('key,value').eq('key', 'systemConfig').limit(1);
+  if (error) { console.error('fetchSystemConfig:', error.message); return {}; }
+  if (!data?.length) return {};
+  try { return JSON.parse(data[0].value); } catch { return {}; }
+};
+
 /** Get all machines from Pro-Maintenance */
 export const fetchMachines = async (): Promise<MachineInfo[]> => {
   const client = getClient();
