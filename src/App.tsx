@@ -4871,7 +4871,10 @@ const DeliverySection: React.FC<SectionProps> = ({ color }) => {
   const [bestTonnage, setBestTonnage] = useState<BestTonnage | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState('');
-  const [bonusToolOpen, setBonusToolOpen] = useState(false);
+  const [bonusToolOpen,     setBonusToolOpen]     = useState(false);
+  const [bonusToolUnlocked, setBonusToolUnlocked] = useState(false);
+  const [bonusPwInput,      setBonusPwInput]      = useState('');
+  const [bonusPwError,      setBonusPwError]      = useState(false);
 
   useEffect(() => {
     idbGet<LKPeriod[]>('loaderKpiPeriods').then(d => { if (d?.length) setLkPeriods(d); });
@@ -5288,239 +5291,234 @@ const DeliverySection: React.FC<SectionProps> = ({ color }) => {
         )}
       </div>
 
-      {/* ── Best Team & Quarterly Award — always visible ─────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* ── Cards: rows 1+2 tightly stacked ─────────────────────── */}
+      <div className="flex flex-col gap-1.5">
+      <div className="grid grid-cols-7 gap-1.5 items-start">
         {/* 历史最佳效率 */}
-        <div className="rounded-2xl border-2 border-amber-200 p-4 flex flex-col gap-3 bg-white shadow-sm">
-          <div className="flex items-center gap-2">
-            <Trophy size={14} className="text-amber-500 shrink-0" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">历史最佳效率</span>
+        <div className="rounded-xl border border-amber-200 p-3 flex flex-col gap-1.5 bg-white shadow-sm">
+          <div className="flex items-center gap-1.5">
+            <Trophy size={12} className="text-amber-500 shrink-0" />
+            <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">历史最佳效率</span>
             {overallBest && shiftBadge(overallBest.shift)}
           </div>
           {overallBest ? (
             <>
-              <div className="flex gap-2 flex-wrap">
+              <div className="flex gap-1 flex-wrap">
                 {overallBest.names.slice(0, 3).map((n, i) => (
-                  <span key={i} className="text-[9px] font-black px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-                    {n.split(' ')[0]}
-                  </span>
+                  <span key={i} className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">{n.split(' ')[0]}</span>
                 ))}
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="text-center">
-                  <div className={cn('text-[22px] font-black leading-none tabular-nums', overallBest.effTph >= 13 ? 'text-emerald-500' : overallBest.effTph >= 8 ? 'text-amber-500' : 'text-red-500')}>
-                    {overallBest.effTph.toFixed(1)}
-                  </div>
-                  <div className="text-[9px] text-slate-400 mt-0.5">t/h (两周均值)</div>
-                </div>
-                <div className="text-center">
-                  <div className={cn('text-[22px] font-black leading-none tabular-nums', overallBest.avgMinutes < 30 ? 'text-emerald-500' : overallBest.avgMinutes < 50 ? 'text-amber-500' : 'text-red-500')}>
-                    {overallBest.avgMinutes}
-                  </div>
-                  <div className="text-[9px] text-slate-400 mt-0.5">均分钟/台</div>
-                </div>
+              <div className="flex items-baseline gap-2">
+                <span className={cn('text-[20px] font-black tabular-nums', overallBest.effTph >= 13 ? 'text-emerald-500' : 'text-amber-500')}>{overallBest.effTph.toFixed(1)}</span>
+                <span className="text-[9px] text-slate-400">t/h · {overallBest.avgMinutes}分/台</span>
               </div>
-              <div className="text-[8px] text-slate-400 font-medium leading-relaxed">{overallBest.truckCount} 台 · {overallBest.totalWeightT.toFixed(1)}t<br/>{overallBest.periodLabel}</div>
+              <div className="text-[7px] text-slate-400">{overallBest.truckCount}台 · {overallBest.totalWeightT.toFixed(1)}t · {overallBest.periodLabel}</div>
             </>
-          ) : (
-            <div className="text-[10px] text-slate-400 py-4 text-center">暂无数据，请上传 Loader KPI</div>
-          )}
+          ) : <div className="text-[9px] text-slate-300 py-2 text-center">暂无数据</div>}
         </div>
 
-        {/* 历史最多装载量 */}
-        <div className="rounded-2xl border-2 border-blue-200 p-4 flex flex-col gap-3 bg-white shadow-sm">
-          <div className="flex items-center gap-2">
-            <BarChart2 size={14} className="text-blue-400 shrink-0" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">历史单日最多装载</span>
+        {/* 历史单日最多装载 */}
+        <div className="rounded-xl border border-blue-200 p-3 flex flex-col gap-1.5 bg-white shadow-sm">
+          <div className="flex items-center gap-1.5">
+            <BarChart2 size={12} className="text-blue-400 shrink-0" />
+            <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">历史单日最多</span>
             {bestTonnage && shiftBadge(bestTonnage.shift)}
           </div>
           {bestTonnage ? (
             <>
-              <div className="flex gap-2 flex-wrap">
+              <div className="flex gap-1 flex-wrap">
                 {bestTonnage.names.slice(0, 3).map((n, i) => (
-                  <span key={i} className="text-[9px] font-black px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-                    {n.split(' ')[0]}
-                  </span>
+                  <span key={i} className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">{n.split(' ')[0]}</span>
                 ))}
               </div>
               <div className="flex items-baseline gap-1">
-                <span className="text-[26px] font-black text-blue-600 tabular-nums">{bestTonnage.totalWeightT.toFixed(1)}</span>
-                <span className="text-[12px] text-blue-400 font-bold">t</span>
+                <span className="text-[20px] font-black text-blue-600 tabular-nums">{bestTonnage.totalWeightT.toFixed(1)}</span>
+                <span className="text-[9px] text-blue-400 font-bold">t</span>
               </div>
-              <div className="text-[8px] text-slate-400 font-medium leading-relaxed">{bestTonnage.truckCount} 台 · {bestTonnage.date}</div>
+              <div className="text-[7px] text-slate-400">{bestTonnage.truckCount}台 · {bestTonnage.date}</div>
             </>
-          ) : (
-            <div className="text-[10px] text-slate-400 py-4 text-center">暂无数据，请上传 Loader KPI</div>
-          )}
+          ) : <div className="text-[9px] text-slate-300 py-2 text-center">暂无数据</div>}
         </div>
 
-        {/* 季度最佳效率奖 */}
-        <div className="rounded-2xl border-2 border-amber-300 p-4 flex flex-col gap-2 bg-gradient-to-br from-amber-50 to-white shadow-sm">
-          <div className="flex items-center gap-2">
-            <Star size={13} className="text-amber-400 shrink-0" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-amber-700">{currentQ} · 季度最佳效率</span>
+        {/* 季度最佳效率 */}
+        <div className="rounded-xl border border-amber-300 p-3 flex flex-col gap-1.5 bg-amber-50/60 shadow-sm">
+          <div className="flex items-center gap-1.5">
+            <Star size={12} className="text-amber-400 shrink-0" />
+            <span className="text-[8px] font-black uppercase tracking-widest text-amber-600">{currentQ} 季度最佳</span>
             {quarterlyBest && shiftBadge(quarterlyBest.shift)}
           </div>
           {quarterlyBest ? (
             <>
-              <div className="flex gap-2 flex-wrap">
+              <div className="flex gap-1 flex-wrap">
                 {quarterlyBest.names.slice(0, 3).map((n, i) => (
-                  <span key={i} className="text-[9px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
-                    {n.split(' ')[0]}
-                  </span>
+                  <span key={i} className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">{n.split(' ')[0]}</span>
                 ))}
               </div>
               <div className="flex items-baseline gap-1">
-                <span className="text-[26px] font-black text-amber-600 tabular-nums">{quarterlyBest.effTph.toFixed(1)}</span>
-                <span className="text-[12px] text-amber-500 font-bold">t/h</span>
+                <span className="text-[20px] font-black text-amber-600 tabular-nums">{quarterlyBest.effTph.toFixed(1)}</span>
+                <span className="text-[9px] text-amber-500 font-bold">t/h</span>
               </div>
-              <div className="text-[8px] text-slate-400 leading-relaxed">{quarterlyBest.totalWeightT.toFixed(1)}t · {quarterlyBest.avgMinutes} 分/台<br/>{quarterlyBest.periodLabel}</div>
+              <div className="text-[7px] text-slate-400">{quarterlyBest.totalWeightT.toFixed(1)}t · {quarterlyBest.avgMinutes}分/台</div>
             </>
-          ) : (
-            <div className="text-[10px] text-slate-400 py-2 text-center">暂无本季度数据</div>
-          )}
+          ) : <div className="text-[9px] text-slate-300 py-2 text-center">暂无数据</div>}
         </div>
+
+        {/* 周期均值 — 4 cards in same grid row */}
+        {([
+          { label:'早班 均首车', value: amSum?.avgStart ?? '—', sub: `末车 ${amSum?.avgEnd ?? '—'}`, border:'border-blue-100', clr:'text-blue-600' },
+          { label:'早班 均效率', value: amSum?.avgSpanStr ?? '—', sub: `利用率 ${amSum ? amSum.utilPct+'%' : '—'} · ${amSum?.avgMin != null ? amSum.avgMin.toFixed(1)+'分' : '—'} · ${amSum?.dailyAvgT.toFixed(1)??'—'}t/天`, border:'border-blue-100', clr:'text-blue-600' },
+          { label:'下午班 均首车', value: pmSum?.avgStart ?? '—', sub: `末车 ${pmSum?.avgEnd ?? '—'}`, border:'border-amber-100', clr:'text-amber-600' },
+          { label:'下午班 均效率', value: pmSum?.avgSpanStr ?? '—', sub: `利用率 ${pmSum ? pmSum.utilPct+'%' : '—'} · ${pmSum?.avgMin != null ? pmSum.avgMin.toFixed(1)+'分' : '—'} · ${pmSum?.dailyAvgT.toFixed(1)??'—'}t/天`, border:'border-amber-100', clr:'text-amber-600' },
+        ] as const).map(({ label, value, sub, border, clr }) => (
+          <div key={label} className={cn('bg-white rounded-xl border p-3 shadow-sm min-w-0 flex flex-col gap-1.5', border)}>
+            <div className="text-[8px] font-black uppercase tracking-widest text-slate-400">{label}</div>
+            <div className={cn('text-[20px] font-black leading-none tabular-nums', clr)}>{value}</div>
+            <div className="text-[8px] text-slate-400 leading-tight">{sub}</div>
+          </div>
+        ))}
       </div>
 
+      {validRows.length > 0 && (() => {
+        const bestDay = Math.max(...chartDates.map(date =>
+          validRows.filter(r=>r.date===date).reduce((s,r)=>s+r.weight/1000,0)), 0);
+        const Card = ({ label, value, unit, sub, borderCls = 'border-slate-100' }: { label:string; value:string; unit?:string; sub?:string; borderCls?:string }) => (
+          <div className={cn('bg-white rounded-xl border px-4 py-3.5 shadow-sm min-w-0', borderCls)}>
+            <div className="text-[8px] font-black uppercase tracking-widest text-slate-400 leading-none">{label}</div>
+            <div className="flex items-baseline gap-1 mt-1.5">
+              <span className="text-[30px] font-black text-slate-800 tabular-nums leading-none">{value}</span>
+              {unit && <span className="text-[13px] font-bold text-slate-400">{unit}</span>}
+            </div>
+            {sub && <div className="text-[8px] text-slate-400 mt-1 leading-tight">{sub}</div>}
+          </div>
+        );
+        return (
+          <div className="grid grid-cols-8 gap-1.5 items-start">
+            <Card label="有效发货量" value={totalWeightT.toFixed(0)} unit="t" sub={`日均 ${(totalWeightT/days).toFixed(1)}t · ${validRows.length}台`} />
+            <Card label="早班 AM" value={amWeightT.toFixed(0)} unit="t" sub={`日均 ${amDatesSet.size>0?(amWeightT/amDatesSet.size).toFixed(1):'—'}t`} borderCls="border-blue-100" />
+            <Card label="下午班 PM" value={pmWeightT.toFixed(0)} unit="t" sub={`日均 ${pmDatesSet.size>0?(pmWeightT/pmDatesSet.size).toFixed(1):'—'}t`} borderCls="border-amber-100" />
+            <Card label="最高单日" value={bestDay.toFixed(0)} unit="t" sub={chartDates.find(d=>validRows.filter(r=>r.date===d).reduce((s,r)=>s+r.weight/1000,0)>=bestDay-0.1)||''} borderCls="border-rose-100" />
+            <Card label="均装车 AM" value={amAvgMin!=null?amAvgMin.toFixed(1):'—'} unit="分" sub="均每台装车" borderCls="border-blue-100" />
+            <Card label="均装车 PM" value={pmAvgMin!=null?pmAvgMin.toFixed(1):'—'} unit="分" sub="均每台装车" borderCls="border-amber-100" />
+            <Card label="效率 AM" value={amAvgTph!=null?amAvgTph.toFixed(1):'—'} unit="t/h" sub="发货量÷工时" borderCls="border-emerald-100" />
+            <Card label="效率 PM" value={pmAvgTph!=null?pmAvgTph.toFixed(1):'—'} unit="t/h" sub="发货量÷工时" borderCls="border-emerald-100" />
+          </div>
+        );
+      })()}
       {validRows.length > 0 ? (
         <>
-          {/* ── Top 4 stat cards ──────────────────────────────────────── */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* 有效发货量 */}
-            <div className="bg-white rounded-2xl border-2 border-slate-100 p-4 shadow-sm">
-              <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">有效发货量</div>
-              <div className="text-[28px] font-black text-slate-800 leading-none tabular-nums">
-                {totalWeightT.toFixed(0)}<span className="text-[13px] font-bold text-slate-400 ml-1">t</span>
-              </div>
-              <div className="text-[9px] text-slate-400 mt-1.5">
-                日均 <span className="font-bold text-slate-600">{(totalWeightT / days).toFixed(1)}t</span>
-                &nbsp;·&nbsp; 有效 <span className="font-bold text-slate-600">{validRows.length}</span> 台
-              </div>
-            </div>
+          {/* ── Two charts 50/50 ─────────────────────────────────────── */}
+          {chartData.length > 0 && <div className="grid grid-cols-2 gap-2 items-start">
 
-            {/* 早班 AM */}
-            <div className="bg-white rounded-2xl border-2 border-blue-100 p-4 shadow-sm">
-              <div className="text-[9px] font-black uppercase tracking-widest text-blue-400 mb-1">早班 AM</div>
-              <div className="text-[28px] font-black text-slate-800 leading-none tabular-nums">
-                {amWeightT.toFixed(0)}<span className="text-[13px] font-bold text-slate-400 ml-1">t</span>
-              </div>
-              <div className="text-[9px] text-slate-400 mt-1.5">
-                日均 <span className="font-bold text-blue-600">{amDatesSet.size > 0 ? (amWeightT / amDatesSet.size).toFixed(1) : '—'}t</span>
-                &nbsp;·&nbsp; 均装车 <span className={cn('font-bold', minColor(amAvgMin))}>{amAvgMin != null ? amAvgMin.toFixed(1) + '分' : '—'}</span>
-              </div>
-            </div>
+          {/* Left: horizontal bar chart */}
+          {(() => {
+            const maxT = Math.max(...chartData.map(d => d.am + d.pm), 1);
+            const allDailyTotals = chartDates.map(date => {
+              const total = (amRows.filter(r=>r.date===date).reduce((s,r)=>s+r.weight/1000,0)) +
+                            (pmRows.filter(r=>r.date===date).reduce((s,r)=>s+r.weight/1000,0));
+              const d = new Date(date); const dow = d.getDay();
+              const isWeekend = dow===0||dow===6;
+              return { date: date.slice(5), total, isWeekend };
+            });
+            const globalMax = Math.max(...allDailyTotals.map(d=>d.total), 180);
+            const recordDay = allDailyTotals.reduce((m,d) => d.total>m.total?d:m, allDailyTotals[0]);
+            const prevTotals = [...allDailyTotals];
 
-            {/* 下午班 PM */}
-            <div className="bg-white rounded-2xl border-2 border-amber-100 p-4 shadow-sm">
-              <div className="text-[9px] font-black uppercase tracking-widest text-amber-500 mb-1">下午班 PM</div>
-              <div className="text-[28px] font-black text-slate-800 leading-none tabular-nums">
-                {pmWeightT.toFixed(0)}<span className="text-[13px] font-bold text-slate-400 ml-1">t</span>
-              </div>
-              <div className="text-[9px] text-slate-400 mt-1.5">
-                日均 <span className="font-bold text-amber-600">{pmDatesSet.size > 0 ? (pmWeightT / pmDatesSet.size).toFixed(1) : '—'}t</span>
-                &nbsp;·&nbsp; 均装车 <span className={cn('font-bold', minColor(pmAvgMin))}>{pmAvgMin != null ? pmAvgMin.toFixed(1) + '分' : '—'}</span>
-              </div>
-            </div>
+            const barClr = (t: number, isWeekend: boolean) => {
+              if (isWeekend || t < 5) return '#d1d5db';
+              if (t >= 180) return '#c0392b';
+              if (t >= 150) return '#27ae60';
+              return '#2980b9';
+            };
+            const txtClr = (t: number, isWeekend: boolean) => {
+              if (isWeekend||t<5) return 'text-slate-400';
+              if (t>=180) return 'text-red-600 font-black';
+              if (t>=150) return 'text-emerald-600 font-bold';
+              return 'text-slate-600';
+            };
 
-            {/* 均装载效率 */}
-            <div className="bg-white rounded-2xl border-2 border-emerald-100 p-4 shadow-sm">
-              <div className="text-[9px] font-black uppercase tracking-widest text-emerald-500 mb-1">均装载效率</div>
-              <div className="grid grid-cols-2 gap-2 mt-1">
-                <div>
-                  <div className="text-[8px] text-blue-400 font-bold mb-0.5">AM 早班</div>
-                  <div className={cn('text-[20px] font-black leading-none tabular-nums', tphColor(amAvgTph))}>
-                    {amAvgTph != null ? amAvgTph.toFixed(1) : '—'}
-                    <span className="text-[9px] font-bold text-slate-400 ml-0.5">t/h</span>
+            return (
+              <div className="bg-white rounded-xl border border-slate-100 p-3 shadow-sm min-w-0">
+                <div className="flex items-center justify-between mb-2 flex-wrap gap-1">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">每日发货量 — 橙色≥180t</span>
+                  <div className="flex gap-3 text-[8px] text-slate-400">
+                    {[['#c0392b','≥180t 高产日'],['#27ae60','150-179t 良好'],['#2980b9','100-149t 正常'],['#d1d5db','周末/停工']].map(([c,l])=>(
+                      <span key={l} className="flex items-center gap-1">
+                        <span className="inline-block w-2 h-2 rounded-sm shrink-0" style={{background:c}}/>
+                        {l}
+                      </span>
+                    ))}
                   </div>
                 </div>
-                <div>
-                  <div className="text-[8px] text-amber-400 font-bold mb-0.5">PM 下午班</div>
-                  <div className={cn('text-[20px] font-black leading-none tabular-nums', tphColor(pmAvgTph))}>
-                    {pmAvgTph != null ? pmAvgTph.toFixed(1) : '—'}
-                    <span className="text-[9px] font-bold text-slate-400 ml-0.5">t/h</span>
-                  </div>
+                {(() => {
+                  const CHART_H = 300;
+                  const rowH = Math.max(14, Math.floor(CHART_H / allDailyTotals.length));
+                  return (
+                <div className="flex flex-col" style={{ height: CHART_H }}>
+                  {allDailyTotals.map((d, i) => {
+                    const pct = d.total/globalMax*100;
+                    const isRecord = d.date === recordDay.date && d.total > 0;
+                    const prev = i > 0 ? prevTotals[i-1].total : null;
+                    const trend = prev != null && d.total > 0 ? (d.total > prev+5 ? '↑' : d.total < prev-5 ? '↓' : '') : '';
+                    const trendClr = trend==='↑'?'text-emerald-500':trend==='↓'?'text-red-400':'text-slate-300';
+                    return (
+                      <div key={d.date} className="flex items-center gap-2" style={{ height: rowH }}>
+                        <div className={cn('text-[8px] w-12 text-right shrink-0 tabular-nums', d.isWeekend?'text-slate-300':d.total<5?'text-slate-300':'text-slate-500')}>
+                          {d.date}{isRecord ? ' 🏆' : d.total>=180 ? ' ⭐' : ''}
+                        </div>
+                        <div className="flex-1 h-4 bg-slate-50 rounded-sm overflow-hidden relative">
+                          {d.total > 0 && (
+                            <div
+                              className="h-full rounded-sm flex items-center pl-1.5 transition-all"
+                              style={{ width:`${Math.max(pct,2)}%`, backgroundColor: barClr(d.total,d.isWeekend) }}
+                            >
+                              <span className="text-[8px] font-bold text-white tabular-nums whitespace-nowrap">
+                                {d.isWeekend||d.total<5 ? '' : d.total.toFixed(1)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className={cn('text-[8px] w-14 tabular-nums shrink-0 flex items-center gap-0.5', txtClr(d.total,d.isWeekend))}>
+                          {d.isWeekend||d.total<5 ? (d.total<0.5?'停工':`${Math.round(d.total)}t`) : `${Math.round(d.total)}t`}
+                          {trend && <span className={cn('text-[8px]',trendClr)}>{trend}</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
+                  );
+                })()}
               </div>
-              <div className="text-[8px] text-slate-400 mt-1.5">发货量 ÷ 首末车时长</div>
-            </div>
-          </div>
+            );
+          })()}
 
-          {/* ── Bar chart ────────────────────────────────────────────── */}
-          {chartData.length > 0 && (
-            <div className="bg-white rounded-2xl border-2 border-slate-100 p-4 shadow-sm">
-              <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-3">每日发货量 (t)</div>
-              <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                  <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={28} />
-                  <Tooltip
-                    contentStyle={{ fontSize: 10, borderRadius: 8, border: '1px solid #e2e8f0' }}
-                    formatter={(v: number, name: string) => [`${v.toFixed(1)} t`, name === 'am' ? '早班 AM' : '下午班 PM']}
-                  />
-                  <Bar dataKey="am" stackId="s" fill="#5c85d6" name="am" radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="pm" stackId="s" fill="#d4874b" name="pm" radius={[3, 3, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-              <div className="flex gap-4 justify-center mt-1">
-                <span className="text-[9px] text-slate-400">
-                  <span className="inline-block w-2.5 h-2.5 rounded-sm mr-1" style={{ background: '#5c85d6', verticalAlign: 'middle' }} />
-                  早班 AM
-                </span>
-                <span className="text-[9px] text-slate-400">
-                  <span className="inline-block w-2.5 h-2.5 rounded-sm mr-1" style={{ background: '#d4874b', verticalAlign: 'middle' }} />
-                  下午班 PM
-                </span>
+          {/* Middle: stacked AM/PM bar chart */}
+            <div className="bg-white rounded-xl border border-slate-100 px-3 py-2 shadow-sm flex flex-col min-w-0">
+              <div className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-1.5">每日发货量 AM / PM (t)</div>
+              <div className="flex-1">
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={chartData} margin={{ top: 2, right: 4, bottom: 0, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                    <XAxis dataKey="date" tick={{ fontSize: 8, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 8, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={24} />
+                    <Tooltip contentStyle={{ fontSize: 9, borderRadius: 6, border: '1px solid #e2e8f0' }}
+                      formatter={(v: number, name: string) => [`${v.toFixed(1)} t`, name==='am'?'早班 AM':'下午班 PM']} />
+                    <Bar dataKey="am" stackId="s" fill="#5c85d6" name="am" radius={[0,0,0,0]} />
+                    <Bar dataKey="pm" stackId="s" fill="#d4874b" name="pm" radius={[2,2,0,0]} />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
-            </div>
-          )}
-
-          {/* ── 周期均值汇总 ──────────────────────────────────────────── */}
-          <div>
-            <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">★ 周期均值汇总</div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* AM 首末车 */}
-              <div className="bg-white rounded-2xl border-2 border-blue-100 p-4 shadow-sm">
-                <div className="text-[9px] font-black uppercase tracking-widest text-blue-400 mb-1">早班 均首车 / 末车</div>
-                <div className="text-[22px] font-black text-blue-600 leading-none tabular-nums">
-                  {amSum?.avgStart ?? '—'}
-                </div>
-                <div className="text-[9px] text-slate-400 mt-1">末车 <span className="font-bold text-blue-400">{amSum?.avgEnd ?? '—'}</span></div>
-              </div>
-
-              {/* AM 均效率 */}
-              <div className="bg-white rounded-2xl border-2 border-blue-100 p-4 shadow-sm">
-                <div className="text-[9px] font-black uppercase tracking-widest text-blue-400 mb-1">早班 均效率</div>
-                <div className="text-[22px] font-black text-blue-600 leading-none tabular-nums">{amSum?.avgSpanStr ?? '—'}</div>
-                <div className="text-[9px] text-slate-400 mt-1">
-                  利用率 <span className={cn('font-bold', amSum ? (amSum.utilPct >= 70 ? 'text-emerald-500' : amSum.utilPct >= 50 ? 'text-amber-500' : 'text-red-500') : 'text-slate-400')}>{amSum ? amSum.utilPct + '%' : '—'}</span>
-                  &nbsp;·&nbsp; 均装车 <span className={cn('font-bold', minColor(amSum?.avgMin ?? null))}>{amSum?.avgMin != null ? amSum.avgMin.toFixed(1) + '分' : '—'}</span>
-                  &nbsp;·&nbsp; 日均 <span className="font-bold text-blue-500">{amSum ? amSum.dailyAvgT.toFixed(1) + 't' : '—'}</span>
-                </div>
-              </div>
-
-              {/* PM 首末车 */}
-              <div className="bg-white rounded-2xl border-2 border-amber-100 p-4 shadow-sm">
-                <div className="text-[9px] font-black uppercase tracking-widest text-amber-500 mb-1">下午班 均首车 / 末车</div>
-                <div className="text-[22px] font-black text-amber-600 leading-none tabular-nums">{pmSum?.avgStart ?? '—'}</div>
-                <div className="text-[9px] text-slate-400 mt-1">末车 <span className="font-bold text-amber-400">{pmSum?.avgEnd ?? '—'}</span></div>
-              </div>
-
-              {/* PM 均效率 */}
-              <div className="bg-white rounded-2xl border-2 border-amber-100 p-4 shadow-sm">
-                <div className="text-[9px] font-black uppercase tracking-widest text-amber-500 mb-1">下午班 均效率</div>
-                <div className="text-[22px] font-black text-amber-600 leading-none tabular-nums">{pmSum?.avgSpanStr ?? '—'}</div>
-                <div className="text-[9px] text-slate-400 mt-1">
-                  利用率 <span className={cn('font-bold', pmSum ? (pmSum.utilPct >= 70 ? 'text-emerald-500' : pmSum.utilPct >= 50 ? 'text-amber-500' : 'text-red-500') : 'text-slate-400')}>{pmSum ? pmSum.utilPct + '%' : '—'}</span>
-                  &nbsp;·&nbsp; 均装车 <span className={cn('font-bold', minColor(pmSum?.avgMin ?? null))}>{pmSum?.avgMin != null ? pmSum.avgMin.toFixed(1) + '分' : '—'}</span>
-                  &nbsp;·&nbsp; 日均 <span className="font-bold text-amber-500">{pmSum ? pmSum.dailyAvgT.toFixed(1) + 't' : '—'}</span>
-                </div>
+              <div className="flex gap-3 justify-center mt-0.5">
+                <span className="text-[8px] text-slate-400 flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm" style={{background:'#5c85d6'}}/>早班 AM</span>
+                <span className="text-[8px] text-slate-400 flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm" style={{background:'#d4874b'}}/>下午班 PM</span>
               </div>
             </div>
-          </div>
+
+          </div>}
 
         </>
-      ) : (
+      ) : null}
+      </div>{/* end card+charts wrapper */}
+      {validRows.length === 0 && (
         /* ── Empty state ──────────────────────────────────────────── */
         <div className="flex-1 flex flex-col items-center justify-center gap-4 py-16 text-center">
           <div className="w-16 h-16 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center">
@@ -5533,34 +5531,79 @@ const DeliverySection: React.FC<SectionProps> = ({ color }) => {
         </div>
       )}
 
-      {/* ── Loader Bonus Tool (collapsible iframe) ─────────────────── */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      {/* ── Loader Bonus Calculator — password protected, collapsible ── */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden shrink-0">
+        {/* Header toggle */}
         <button
-          onClick={() => setBonusToolOpen(o => !o)}
-          className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors"
+          onClick={() => {
+            if (!bonusToolUnlocked) {
+              setBonusToolOpen(o => !o);
+            } else {
+              setBonusToolOpen(o => !o);
+            }
+          }}
+          className="w-full flex items-center justify-between px-4 py-3 hover:bg-amber-50/60 transition-colors"
         >
           <div className="flex items-center gap-2">
-            <BarChart2 size={14} className="text-amber-500" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">
-              Loader Bonus Calculator — 奖金计算工具
-            </span>
-            <span className="text-[9px] text-slate-400 font-medium">
-              效率分 · 难度分 · 班次系数 · PDF 导出
-            </span>
+            <BarChart2 size={14} className="text-amber-500 shrink-0" />
+            <span className="text-[11px] font-black text-slate-700">Loader Bonus Calculator — 奖金计算工具</span>
+            <span className="text-[9px] text-slate-400">效率分 · 难度分 · 班次系数 · 导出 PDF</span>
+            {bonusToolUnlocked && <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-600 font-bold">🔓 已解锁</span>}
           </div>
-          <div className={cn('transition-transform duration-200', bonusToolOpen ? 'rotate-180' : '')}>
-            <ChevronDown size={14} className="text-slate-400" />
-          </div>
+          <ChevronDown size={14} className={cn('text-slate-400 transition-transform duration-200 shrink-0', bonusToolOpen && 'rotate-180')} />
         </button>
 
-        {bonusToolOpen && (
+        {bonusToolOpen && !bonusToolUnlocked && (
+          /* Password prompt */
+          <div className="border-t border-slate-100 flex flex-col items-center justify-center py-10 gap-4">
+            <Lock size={28} className="text-slate-300" />
+            <div className="text-center">
+              <p className="text-[11px] font-black text-slate-600 mb-1">请输入访问密码</p>
+              <p className="text-[9px] text-slate-400">此功能需要密码验证</p>
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={bonusPwInput}
+                onChange={e => { setBonusPwInput(e.target.value); setBonusPwError(false); }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    if (bonusPwInput === 'finesteel') {
+                      setBonusToolUnlocked(true); setBonusPwError(false); setBonusPwInput('');
+                    } else {
+                      setBonusPwError(true); setBonusPwInput('');
+                    }
+                  }
+                }}
+                placeholder="密码"
+                className={cn('text-[11px] px-3 py-2 rounded-xl border focus:outline-none w-40',
+                  bonusPwError ? 'border-red-300 bg-red-50' : 'border-slate-200 focus:border-amber-400')}
+                autoFocus
+              />
+              <button
+                onClick={() => {
+                  if (bonusPwInput === 'finesteel') {
+                    setBonusToolUnlocked(true); setBonusPwError(false); setBonusPwInput('');
+                  } else {
+                    setBonusPwError(true); setBonusPwInput('');
+                  }
+                }}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-black rounded-xl transition-colors"
+              >
+                确认
+              </button>
+            </div>
+            {bonusPwError && <p className="text-[9px] text-red-500 font-bold">密码错误，请重试</p>}
+          </div>
+        )}
+
+        {bonusToolOpen && bonusToolUnlocked && (
           <div className="border-t border-slate-100">
             <iframe
               src="/loader-bonus.html"
-              className="w-full border-0"
-              style={{ height: '90vh', minHeight: 700 }}
+              className="w-full border-0 block"
+              style={{ height: '88vh' }}
               title="Loader Bonus Calculator"
-              allow="downloads"
             />
           </div>
         )}
@@ -6200,18 +6243,22 @@ const MachineSection: React.FC<SectionProps> = ({ color }) => {
   const STATUS_TXT:   Record<string,string> = { completed:'已完成', in_progress:'进行中', pending:'待处理' };
 
   // ── Supabase / Pro-Maintenance sync ──────────────────────────────────────
-  const [maintRecords, setMaintRecords] = useState<import('./lib/maintenance-supabase').MaintRecord[]>([]);
-  const [syncStatus,   setSyncStatus]   = useState<'idle'|'syncing'|'ok'|'err'>('idle');
-  const [lastSync,     setLastSync]     = useState<string>('');
+  const [maintRecords,    setMaintRecords]    = useState<import('./lib/maintenance-supabase').MaintRecord[]>([]);
+  const [supabaseMachines,setSupabaseMachines]= useState<import('./lib/maintenance-supabase').MachineInfo[]>([]);
+  const [syncStatus,      setSyncStatus]      = useState<'idle'|'syncing'|'ok'|'err'>('idle');
+  const [lastSync,        setLastSync]        = useState<string>('');
 
   const syncFromMaintenance = async () => {
     setSyncStatus('syncing');
     try {
-      const { fetchMaintenanceRecords } = await import('./lib/maintenance-supabase');
-      const now = new Date();
-      const fromDate = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
-      const recs = await fetchMaintenanceRecords(fromDate);
+      const { fetchMaintenanceRecords, fetchMachines } = await import('./lib/maintenance-supabase');
+      // Fetch all records (no date filter) to get full machine list & history
+      const [recs, machineList] = await Promise.all([
+        fetchMaintenanceRecords(),
+        fetchMachines(),
+      ]);
       setMaintRecords(recs);
+      if (machineList.length > 0) setSupabaseMachines(machineList);
       setLastSync(new Date().toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit' }));
       setSyncStatus('ok');
     } catch { setSyncStatus('err'); }
@@ -6310,6 +6357,20 @@ const MachineSection: React.FC<SectionProps> = ({ color }) => {
     saveDtLogs([{ id:Date.now().toString(), timestamp:Date.now(), date:fDate, machine:fMachine, shift:fShift, type:fType, duration:parseInt(fDuration)||0, notes:fNotes.trim()||undefined }, ...dtLogs]);
     setAddModal(false); setFDuration(''); setFNotes('');
   };
+
+  // ── All machines: hardcoded + Supabase + any that appear in records ──
+  const hardcodedNames = new Set(machines.map(m => m.name));
+  const allMachines: { name: string }[] = [
+    ...machines,
+    ...supabaseMachines.filter(m => !hardcodedNames.has(m.name)).map(m => ({ name: m.name })),
+  ];
+  const knownMachineNames = new Set(allMachines.map(m => m.name));
+  [...new Set<string>(maintRecords.map(r => r.machineName))]
+    .filter((n): n is string => !!n && !knownMachineNames.has(n))
+    .forEach(n => allMachines.push({ name: n }));
+
+  const shiftPlanH = (8 - 45/60) * 2 * new Date().getDate();
+  const msNow = new Date();
 
   return (
     <SectionWrapper title="Machine - Plant Efficiency" icon={Cpu} color={color}>
@@ -6644,7 +6705,7 @@ const MachineSection: React.FC<SectionProps> = ({ color }) => {
                 <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-slate-300"/>No Plan</span>
               </div>
             </div>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto" style={{height: 510}}>
               <div style={{ position:'relative', width:1440, height:510, backgroundColor:'#f0f4ff' }}>
 
                 {/* ── Zone backgrounds ── */}
@@ -6716,62 +6777,194 @@ const MachineSection: React.FC<SectionProps> = ({ color }) => {
 
               </div>
             </div>
+
+            {/* ── Machine Status ── */}
+            <div className="border-t border-slate-200">
+              <div className="flex items-center justify-between px-4 py-2 bg-slate-50">
+                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Machine Status — 机器状态</span>
+                <div className="flex gap-3 text-[8px] text-slate-400">
+                  {([["bg-emerald-500","Running"],["bg-amber-400","Restricted"],["bg-red-500","Down"],["bg-slate-300","No Plan"]] as string[][]).map(([c,l])=>(
+                    <span key={l} className="flex items-center gap-1"><span className={cn("w-2 h-2 rounded-full",c)}/>{l}</span>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-4 lg:grid-cols-8 divide-x divide-y divide-slate-100">
+                {allMachines.map(m => {
+                  const st = getMachineStatus(m.name);
+                  const recs = maintRecords.filter(r => r.machineName === m.name);
+                  const latest = recs[0];
+                  const monthDtH = recs.filter(r => { const d = new Date(r.date); return d.getFullYear()===msNow.getFullYear()&&d.getMonth()===msNow.getMonth(); }).reduce((s,r)=>s+(r.totalDowntime||0),0);
+                  const avail = shiftPlanH > 0 ? Math.max(0, Math.round((1 - monthDtH/shiftPlanH)*100)) : null;
+                  const supaStatus = latest ? ({ Running:"run", Restricted:"warn", Down:"error" }[latest.machineStatusAfter] ?? st) : st;
+                  const ds = machineStatuses[m.name] ?? supaStatus;
+                  const dCls: Record<string,string> = { run:"bg-emerald-500", warn:"bg-amber-400", error:"bg-red-500 animate-pulse", idle:"bg-slate-300" };
+                  const rClr = (rv: string) => ({ Fixed:"bg-emerald-100 text-emerald-700", Temporary:"bg-amber-100 text-amber-700", "Not Fixed":"bg-red-100 text-red-600", Observation:"bg-blue-100 text-blue-700" }[rv] ?? "bg-slate-100 text-slate-500");
+                  return (
+                    <div key={m.name} onClick={()=>setStatusModal(m.name)} className="flex flex-col gap-1.5 p-3 hover:bg-slate-50/60 cursor-pointer bg-white">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1"><Cpu size={11} className="text-slate-400 shrink-0"/><span className="text-[10px] font-black text-slate-800 truncate">{m.name}</span></div>
+                        <div className={cn("w-2 h-2 rounded-full shrink-0", dCls[ds]??"bg-slate-300")}/>
+                      </div>
+                      <div className={cn("text-[7px] font-bold", ds==="run"?"text-emerald-600":ds==="error"?"text-red-500":ds==="warn"?"text-amber-500":"text-slate-400")}>
+                        {ds==="run"?"Running":ds==="error"?"Down":ds==="warn"?"Restricted":"No Plan"}
+                      </div>
+                      {avail != null && <div><div className="flex justify-between items-baseline"><span className="text-[6px] text-slate-400">AVAIL</span><span className={cn("text-[11px] font-black tabular-nums", avail>=90?"text-emerald-600":avail>=75?"text-amber-500":"text-red-500")}>{avail}%</span></div><div className="h-1 bg-slate-100 rounded-full overflow-hidden"><div className={cn("h-full", avail>=90?"bg-emerald-500":avail>=75?"bg-amber-400":"bg-red-500")} style={{width:`${avail}%`}}/></div></div>}
+                      {latest && <div className="text-[6px] text-slate-400">{latest.date}{latest.repairResult&&<span className={cn("ml-1 px-1 rounded text-[6px] font-bold",rClr(latest.repairResult))}>{latest.repairResult}</span>}{monthDtH>0&&<span className="ml-1 text-red-400 font-bold">↓{monthDtH.toFixed(1)}h</span>}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ── Maintenance Logs ── */}
+            <div className="border-t border-slate-200">
+              <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 flex-wrap">
+                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Maintenance Logs — 维修记录</span>
+                <div className="flex gap-1 flex-wrap ml-1">
+                  {(["all",...allMachines.map(m=>m.name)] as string[]).map(name=>(
+                    <button key={name} onClick={()=>setWoMachine(name)} className={cn("text-[8px] px-2 py-0.5 rounded-full font-bold transition-colors", woMachine===name?"bg-slate-800 text-white":"bg-slate-100 text-slate-500 hover:bg-slate-200")}>{name==="all"?"全部":name}</button>
+                  ))}
+                </div>
+                <span className="text-[8px] text-slate-300 ml-auto">{maintRecords.filter(r=>woMachine==="all"||r.machineName===woMachine).length} 条</span>
+              </div>
+              {maintRecords.length > 0 ? (
+                <div className="overflow-x-auto" style={{maxHeight:300,overflowY:"auto"}}>
+                  <table className="w-full text-[9px]">
+                    <thead style={{position:"sticky",top:0,zIndex:1}}><tr className="border-b border-slate-100 bg-slate-50">{["日期","班次","机器","故障区域","类型","难度","停机(h)","维修结果","机器状态","技术员"].map(h=><th key={h} className="text-left px-3 py-2 font-bold text-slate-400 whitespace-nowrap">{h}</th>)}</tr></thead>
+                    <tbody>{maintRecords.filter(r=>woMachine==="all"||r.machineName===woMachine).slice(0,100).map((r,i)=>(
+                      <tr key={r.id} className={cn("border-t border-slate-50 hover:bg-slate-50/60",i%2===1?"bg-slate-50/20":"")}>
+                        <td className="px-3 py-1.5 font-bold text-slate-700 whitespace-nowrap">{r.date}</td>
+                        <td className="px-3 py-1.5"><span className={cn("px-1.5 py-0.5 rounded-full text-[7px] font-black",r.shift==="AM"?"bg-blue-100 text-blue-700":"bg-amber-100 text-amber-700")}>{r.shift||"—"}</span></td>
+                        <td className="px-3 py-1.5 font-black text-slate-800 whitespace-nowrap">{r.machineName}</td>
+                        <td className="px-3 py-1.5 text-slate-600 max-w-[120px] truncate">{r.faultArea||"—"}</td>
+                        <td className="px-3 py-1.5 text-slate-500 whitespace-nowrap">{r.maintenanceType||"—"}</td>
+                        <td className="px-3 py-1.5">{r.difficulty?<span className={cn("font-black",r.difficulty<=2?"text-emerald-600":r.difficulty<=3?"text-amber-500":"text-red-500")}>L{r.difficulty}</span>:"—"}</td>
+                        <td className={cn("px-3 py-1.5 font-black tabular-nums",r.totalDowntime>0?"text-red-500":"text-slate-400")}>{r.totalDowntime>0?r.totalDowntime.toFixed(1):"—"}</td>
+                        <td className="px-3 py-1.5">{r.repairResult?<span className={cn("px-1.5 py-0.5 rounded text-[7px] font-bold",({Fixed:"bg-emerald-100 text-emerald-700",Temporary:"bg-amber-100 text-amber-700","Not Fixed":"bg-red-100 text-red-600",Observation:"bg-blue-100 text-blue-700"} as Record<string,string>)[r.repairResult]??"bg-slate-100 text-slate-500")}>{r.repairResult}</span>:"—"}</td>
+                        <td className="px-3 py-1.5">{r.machineStatusAfter?<span className={cn("px-1.5 py-0.5 rounded text-[7px] font-bold",r.machineStatusAfter==="Running"?"bg-emerald-100 text-emerald-700":r.machineStatusAfter==="Restricted"?"bg-amber-100 text-amber-700":"bg-red-100 text-red-600")}>{r.machineStatusAfter}</span>:"—"}</td>
+                        <td className="px-3 py-1.5 text-slate-500 whitespace-nowrap">{r.technician||"—"}</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-slate-300 gap-2 bg-white">
+                  <History size={20}/><span className="text-[9px] font-bold">暂无记录 — 点击「同步保养系统」加载</span>
+                </div>
+              )}
+            </div>
           </div>
         );
       })()}
 
-      {/* ── Machine cards ─────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {machines.map(m => {
-          const status = getMachineStatus(m.name);
-          const mMins  = byMachine.find(b => b.name === m.name)?.mins ?? 0;
-          const statusLabel: Record<string,string> = { run:'运行中', warn:'维修保养', error:'停机', idle:'无计划' };
-          const dotCls: Record<string,string> = {
-            run:  'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]',
-            warn: 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]',
-            error:'bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]',
-            idle: 'bg-slate-300',
-          };
-          const iconBg: Record<string,string> = { run:'bg-emerald-50', warn:'bg-amber-50', error:'bg-red-50', idle:'bg-slate-50' };
-          return (
-            <div key={m.name}
-              onClick={() => setStatusModal(m.name)}
-              className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col gap-3 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer">
-              <div className="flex justify-between items-start">
-                <div className="flex items-center gap-2">
-                  <div className={cn('p-1.5 rounded-lg', iconBg[status] ?? 'bg-slate-50')}><Cpu size={16} className="text-slate-600"/></div>
-                  <div>
-                    <h4 className="font-black text-slate-800 text-sm leading-none">{m.name}</h4>
-                    <p className={cn('text-[9px] font-bold mt-0.5', status==='run'?'text-emerald-500':status==='error'?'text-red-500':status==='warn'?'text-amber-500':'text-slate-400')}>
-                      {statusLabel[status] ?? status}
-                    </p>
-                  </div>
-                </div>
-                <div className={cn('w-2 h-2 rounded-full mt-1 shrink-0', dotCls[status] ?? 'bg-slate-300')}/>
-              </div>
-              <div>
-                <div className="flex items-baseline justify-between mb-1">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase">Efficiency</p>
-                  <span className="text-xl font-black text-slate-800">{m.oee}%</span>
-                </div>
-                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                  <motion.div initial={{ width:0 }} animate={{ width:`${m.oee}%` }} transition={{ duration:1, delay:0.1 }}
-                    className={cn('h-full rounded-full', m.oee>90?'bg-emerald-500':m.oee>70?'bg-blue-500':'bg-red-500')} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-1.5">
-                <div className="bg-slate-50 p-1.5 rounded-lg text-center">
-                  <p className="text-[8px] font-bold text-slate-400 uppercase">状态时长</p>
-                  <p className="text-[10px] font-black text-slate-700">{status==='run'?'运行':'停机'}</p>
-                </div>
-                <div className={cn('p-1.5 rounded-lg text-center border', mMins>0?'bg-red-50 border-red-100':'bg-slate-50 border-slate-100')}>
-                  <p className="text-[8px] font-bold text-slate-400 uppercase">停机MTD</p>
-                  <p className={cn('text-[10px] font-black', mMins>0?'text-red-500':'text-slate-400')}>{mMins>0?fmtH(mMins):'—'}</p>
-                </div>
+      {/* ══ (old Machine Status block - now inside floor plan card) ══ */}
+      {(() => {
+        const dotCls: Record<string,string> = { run:'bg-emerald-500', warn:'bg-amber-400', error:'bg-red-500 animate-pulse', idle:'bg-slate-300' };
+        const resClr = (r: string) => ({ Fixed:'bg-emerald-100 text-emerald-700', Temporary:'bg-amber-100 text-amber-700', 'Not Fixed':'bg-red-100 text-red-600', Observation:'bg-blue-100 text-blue-700' }[r] ?? 'bg-slate-100 text-slate-500');
+
+        return (
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
+              <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Machine Status — 机器状态</span>
+              <div className="flex gap-3 text-[8px] text-slate-400">
+                {[['bg-emerald-500','Running'],['bg-amber-400','Restricted'],['bg-red-500','Down'],['bg-slate-300','No Plan']].map(([c,l])=>(
+                  <span key={l} className="flex items-center gap-1"><span className={cn('w-2 h-2 rounded-full',c)}/>{l}</span>
+                ))}
               </div>
             </div>
-          );
-        })}
+            <div className="grid grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 divide-x divide-y divide-slate-100">
+              {allMachines.map(m => {
+                const st = getMachineStatus(m.name);
+                const recs = maintRecords.filter(r => r.machineName === m.name);
+                const latest = recs[0];
+                const monthDtH = recs.filter(r => { const d = new Date(r.date); return d.getFullYear()===msNow.getFullYear()&&d.getMonth()===msNow.getMonth(); }).reduce((s,r)=>s+(r.totalDowntime||0),0);
+                const avail = shiftPlanH > 0 ? Math.max(0, Math.round((1 - monthDtH/shiftPlanH)*100)) : null;
+                const supaStatus = latest ? ({ Running:'run', Restricted:'warn', Down:'error' }[latest.machineStatusAfter] ?? st) : st;
+                const ds = machineStatuses[m.name] ?? supaStatus;
+                return (
+                  <div key={m.name} onClick={()=>setStatusModal(m.name)}
+                    className="flex flex-col gap-1.5 p-3 hover:bg-slate-50/60 cursor-pointer">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1"><Cpu size={11} className="text-slate-400"/><span className="text-[10px] font-black text-slate-800 truncate">{m.name}</span></div>
+                      <div className={cn('w-2 h-2 rounded-full shrink-0', dotCls[ds]??'bg-slate-300')}/>
+                    </div>
+                    <div className={cn('text-[7px] font-bold', ds==='run'?'text-emerald-600':ds==='error'?'text-red-500':ds==='warn'?'text-amber-500':'text-slate-400')}>
+                      {ds==='run'?'Running':ds==='error'?'Down':ds==='warn'?'Restricted':'No Plan'}
+                    </div>
+                    {avail != null && (
+                      <div>
+                        <div className="flex justify-between items-baseline">
+                          <span className="text-[6px] text-slate-400">AVAIL</span>
+                          <span className={cn('text-[11px] font-black tabular-nums', avail>=90?'text-emerald-600':avail>=75?'text-amber-500':'text-red-500')}>{avail}%</span>
+                        </div>
+                        <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+                          <div className={cn('h-full', avail>=90?'bg-emerald-500':avail>=75?'bg-amber-400':'bg-red-500')} style={{width:`${avail}%`}}/>
+                        </div>
+                      </div>
+                    )}
+                    {latest && (
+                      <div className="text-[6px] text-slate-400 leading-relaxed">
+                        {latest.date}
+                        {latest.repairResult && <span className={cn('ml-1 px-1 py-0.5 rounded text-[6px] font-bold', resClr(latest.repairResult))}>{latest.repairResult}</span>}
+                        {monthDtH > 0 && <span className="ml-1 text-red-400 font-bold">↓{monthDtH.toFixed(1)}h</span>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ══ Maintenance Logs ═══════════════════════════════════════════ */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100 flex-wrap">
+          <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Maintenance Logs — 维修记录</span>
+          <div className="flex gap-1 flex-wrap">
+            {(['all', ...machines.map(m=>m.name), ...supabaseMachines.filter(m=>!machines.some(hm=>hm.name===m.name)).map(m=>m.name)] as string[]).map(name => (
+              <button key={name} onClick={()=>setWoMachine(name)}
+                className={cn('text-[8px] px-2 py-0.5 rounded-full font-bold transition-colors',
+                  woMachine===name ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200')}>
+                {name==='all'?'全部':name}
+              </button>
+            ))}
+          </div>
+          <span className="text-[8px] text-slate-300 ml-auto">{maintRecords.filter(r=>woMachine==='all'||r.machineName===woMachine).length} 条</span>
+        </div>
+        {maintRecords.length > 0 ? (
+          <div className="overflow-x-auto max-h-96 overflow-y-auto">
+            <table className="w-full text-[9px]">
+              <thead className="sticky top-0">
+                <tr className="border-b border-slate-100 bg-slate-50">
+                  {['日期','班次','机器','故障区域','类型','难度','停机(h)','维修结果','机器状态','技术员'].map(h=>(
+                    <th key={h} className="text-left px-3 py-2 font-bold text-slate-400 whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {maintRecords.filter(r=>woMachine==='all'||r.machineName===woMachine).slice(0,100).map((r,i)=>(
+                  <tr key={r.id} className={cn('border-t border-slate-50 hover:bg-slate-50/60', i%2===1?'bg-slate-50/20':'')}>
+                    <td className="px-3 py-1.5 font-bold text-slate-700 whitespace-nowrap">{r.date}</td>
+                    <td className="px-3 py-1.5"><span className={cn('px-1.5 py-0.5 rounded-full text-[7px] font-black', r.shift==='AM'?'bg-blue-100 text-blue-700':'bg-amber-100 text-amber-700')}>{r.shift||'—'}</span></td>
+                    <td className="px-3 py-1.5 font-black text-slate-800 whitespace-nowrap">{r.machineName}</td>
+                    <td className="px-3 py-1.5 text-slate-600 max-w-[120px] truncate">{r.faultArea||'—'}</td>
+                    <td className="px-3 py-1.5 text-slate-500 whitespace-nowrap">{r.maintenanceType||'—'}</td>
+                    <td className="px-3 py-1.5">{r.difficulty?<span className={cn('font-black',r.difficulty<=2?'text-emerald-600':r.difficulty<=3?'text-amber-500':'text-red-500')}>L{r.difficulty}</span>:'—'}</td>
+                    <td className={cn('px-3 py-1.5 font-black tabular-nums',r.totalDowntime>0?'text-red-500':'text-slate-400')}>{r.totalDowntime>0?r.totalDowntime.toFixed(1):'—'}</td>
+                    <td className="px-3 py-1.5">{r.repairResult?<span className={cn('px-1.5 py-0.5 rounded text-[7px] font-bold',{Fixed:'bg-emerald-100 text-emerald-700',Temporary:'bg-amber-100 text-amber-700','Not Fixed':'bg-red-100 text-red-600',Observation:'bg-blue-100 text-blue-700'}[r.repairResult]??'bg-slate-100 text-slate-500')}>{r.repairResult}</span>:'—'}</td>
+                    <td className="px-3 py-1.5">{r.machineStatusAfter?<span className={cn('px-1.5 py-0.5 rounded text-[7px] font-bold',r.machineStatusAfter==='Running'?'bg-emerald-100 text-emerald-700':r.machineStatusAfter==='Restricted'?'bg-amber-100 text-amber-700':'bg-red-100 text-red-600')}>{r.machineStatusAfter}</span>:'—'}</td>
+                    <td className="px-3 py-1.5 text-slate-500 whitespace-nowrap">{r.technician||'—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-12 text-slate-300 gap-2">
+            <History size={24}/><span className="text-[9px] font-bold">暂无记录 — 点击「同步保养系统」加载</span>
+          </div>
+        )}
       </div>
 
       {/* ── 4.3.3 维修工单管理 Work Order Tracker ─────────────────── */}
