@@ -7039,10 +7039,41 @@ const MachineSection: React.FC<SectionProps> = ({ color }) => {
         const supportMachines  = machineNames.filter(isSupport);
         const prodMachines     = machineNames.filter(m => !isForklift(m) && !isCrane(m) && !isSupport(m));
 
+        const [showImport, setShowImport] = React.useState(false);
+        const [importText, setImportText] = React.useState('');
+        const doImport = () => {
+          try {
+            const parsed = JSON.parse(importText);
+            localStorage.setItem('systemConfig', JSON.stringify(parsed));
+            setMachineProConfig(parsed);
+            setShowImport(false);
+            setImportText('');
+          } catch { alert('JSON 格式错误，请重新复制'); }
+        };
+
         return (
           <>
             {/* ── Machine card grid ─────────────────────────────────────────── */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden shrink-0">
+              {showImport && (
+                <div className="p-4 bg-blue-50 border-b border-blue-100 flex flex-col gap-2">
+                  <p className="text-[10px] font-bold text-blue-700 uppercase tracking-widest">从 Pro-Maintenance 导入子系统配置</p>
+                  <p className="text-[9px] text-blue-500">在 Pro-Maintenance 浏览器控制台运行：<code className="bg-blue-100 px-1 rounded">copy(localStorage.getItem('systemConfig'))</code>，然后粘贴到下方</p>
+                  <textarea value={importText} onChange={e => setImportText(e.target.value)}
+                    placeholder='{"FT-1":{"液压系统":["主泵","油缸"],...},...}'
+                    className="w-full h-24 text-[9px] font-mono border border-blue-200 rounded-lg p-2 resize-none focus:outline-none focus:border-blue-400"/>
+                  <div className="flex gap-2">
+                    <button onClick={doImport} className="px-3 py-1.5 bg-blue-600 text-white text-[9px] font-bold rounded-lg hover:bg-blue-700">导入</button>
+                    <button onClick={() => setShowImport(false)} className="px-3 py-1.5 bg-white text-slate-500 text-[9px] font-bold rounded-lg border hover:bg-slate-50">取消</button>
+                  </div>
+                </div>
+              )}
+              <div className="px-6 pt-4 pb-0 flex justify-end">
+                <button onClick={() => setShowImport(v => !v)}
+                  className="text-[8px] font-bold text-slate-400 hover:text-blue-500 flex items-center gap-1 border border-slate-200 rounded-lg px-2 py-1 hover:border-blue-300 transition-colors">
+                  ⚙ 导入子系统配置
+                </button>
+              </div>
               <div className="p-6 space-y-10">
                 {prodMachines.length > 0 && (
                   <div className="space-y-4">
