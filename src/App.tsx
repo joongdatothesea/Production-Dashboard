@@ -6791,44 +6791,6 @@ const MachineSection: React.FC<SectionProps> = ({ color }) => {
               </div>
             </div>
 
-            {/* ── Machine Status ── */}
-            <div className="border-t border-slate-200">
-              <div className="flex items-center justify-between px-4 py-2 bg-slate-50">
-                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Machine Status — 机器状态</span>
-                <div className="flex gap-3 text-[8px] text-slate-400">
-                  {([["bg-emerald-500","Running"],["bg-amber-400","Restricted"],["bg-red-500","Down"],["bg-slate-300","No Plan"]] as string[][]).map(([c,l])=>(
-                    <span key={l} className="flex items-center gap-1"><span className={cn("w-2 h-2 rounded-full",c)}/>{l}</span>
-                  ))}
-                </div>
-              </div>
-              <div className="grid grid-cols-4 lg:grid-cols-8 divide-x divide-y divide-slate-100">
-                {allMachines.map(m => {
-                  const st = getMachineStatus(m.name);
-                  const recs = maintRecords.filter(r => r.machineName === m.name);
-                  const latest = recs[0];
-                  const monthDtH = recs.filter(r => { const d = new Date(r.date); return d.getFullYear()===msNow.getFullYear()&&d.getMonth()===msNow.getMonth(); }).reduce((s,r)=>s+(r.totalDowntime||0),0);
-                  const avail = shiftPlanH > 0 ? Math.max(0, Math.round((1 - monthDtH/shiftPlanH)*100)) : null;
-                  const supaStatus = latest ? ({ Running:"run", Restricted:"warn", Down:"error" }[latest.machineStatusAfter] ?? st) : st;
-                  const ds = machineStatuses[m.name] ?? supaStatus;
-                  const dCls: Record<string,string> = { run:"bg-emerald-500", warn:"bg-amber-400", error:"bg-red-500 animate-pulse", idle:"bg-slate-300" };
-                  const rClr = (rv: string) => ({ Fixed:"bg-emerald-100 text-emerald-700", Temporary:"bg-amber-100 text-amber-700", "Not Fixed":"bg-red-100 text-red-600", Observation:"bg-blue-100 text-blue-700" }[rv] ?? "bg-slate-100 text-slate-500");
-                  return (
-                    <div key={m.name} onClick={()=>setStatusModal(m.name)} className="flex flex-col gap-1.5 p-3 hover:bg-slate-50/60 cursor-pointer bg-white">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1"><Cpu size={11} className="text-slate-400 shrink-0"/><span className="text-[10px] font-black text-slate-800 truncate">{m.name}</span></div>
-                        <div className={cn("w-2 h-2 rounded-full shrink-0", dCls[ds]??"bg-slate-300")}/>
-                      </div>
-                      <div className={cn("text-[7px] font-bold", ds==="run"?"text-emerald-600":ds==="error"?"text-red-500":ds==="warn"?"text-amber-500":"text-slate-400")}>
-                        {ds==="run"?"Running":ds==="error"?"Down":ds==="warn"?"Restricted":"No Plan"}
-                      </div>
-                      {avail != null && <div><div className="flex justify-between items-baseline"><span className="text-[6px] text-slate-400">AVAIL</span><span className={cn("text-[11px] font-black tabular-nums", avail>=90?"text-emerald-600":avail>=75?"text-amber-500":"text-red-500")}>{avail}%</span></div><div className="h-1 bg-slate-100 rounded-full overflow-hidden"><div className={cn("h-full", avail>=90?"bg-emerald-500":avail>=75?"bg-amber-400":"bg-red-500")} style={{width:`${avail}%`}}/></div></div>}
-                      {latest && <div className="text-[6px] text-slate-400">{latest.date}{latest.repairResult&&<span className={cn("ml-1 px-1 rounded text-[6px] font-bold",rClr(latest.repairResult))}>{latest.repairResult}</span>}{monthDtH>0&&<span className="ml-1 text-red-400 font-bold">↓{monthDtH.toFixed(1)}h</span>}</div>}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
             {/* ── Maintenance Logs ── */}
             <div className="border-t border-slate-200">
               <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 flex-wrap">
@@ -7058,7 +7020,7 @@ const MachineSection: React.FC<SectionProps> = ({ color }) => {
         return (
           <>
             {/* ── Machine card grid ─────────────────────────────────────────── */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden shrink-0">
               <div className="flex items-center gap-4 px-6 py-4 border-b border-slate-100">
                 <div className="p-3 bg-blue-50 rounded-xl text-blue-600"><Activity size={20}/></div>
                 <div>
@@ -7330,7 +7292,7 @@ const MachineSection: React.FC<SectionProps> = ({ color }) => {
 
 
             {/* ══ Maintenance Logs ═══════════════════════════════════════════ */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden shrink-0">
         <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100 flex-wrap">
           <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Maintenance Logs — 维修记录</span>
           <div className="flex gap-1 flex-wrap">
