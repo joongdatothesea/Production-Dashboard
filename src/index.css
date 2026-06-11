@@ -18,6 +18,10 @@
 }
 
 @layer base {
+  html {
+    /* Scale all rem-based fonts with viewport width. 1440px = 16px baseline. */
+    font-size: clamp(11px, 1.111vw, 20px);
+  }
   body {
     @apply bg-industrial-bg text-industrial-text font-sans antialiased;
   }
