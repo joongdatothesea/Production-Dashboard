@@ -6180,6 +6180,14 @@ const MachineSection: React.FC<SectionProps> = ({ color }) => {
     } catch { return {}; }
   });
   const [quickDt, setQuickDt]         = useState<{ machine:string; dur:number; type:string; shift:'AM'|'PM'; reason:string } | null>(null);
+  const floorRef  = React.useRef<HTMLDivElement>(null);
+  const [fpScale, setFpScale] = React.useState(1);
+  React.useEffect(() => {
+    if (!floorRef.current) return;
+    const ro = new ResizeObserver(([e]) => setFpScale(e.contentRect.width / 1440));
+    ro.observe(floorRef.current);
+    return () => ro.disconnect();
+  }, []);
 
   // ── Work Order state (4.3.3) ──────────────────────────────────────────────
   const [workOrders,    setWorkOrders]    = useState<WorkOrder[]>([]);
@@ -6731,8 +6739,8 @@ const MachineSection: React.FC<SectionProps> = ({ color }) => {
                 <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-slate-300"/>No Plan</span>
               </div>
             </div>
-            <div className="overflow-x-auto" style={{height: 510}}>
-              <div style={{ position:'relative', width:1440, height:510, backgroundColor:'#f0f4ff' }}>
+            <div ref={floorRef} style={{ position:'relative', width:'100%', height: Math.round(510 * fpScale), overflow:'hidden' }}>
+              <div style={{ position:'absolute', top:0, left:0, width:1440, height:510, backgroundColor:'#f0f4ff', transformOrigin:'top left', transform:`scale(${fpScale})` }}>
 
                 {/* ── Zone backgrounds ── */}
                 <div style={{ position:'absolute', left:0, top:0, right:0, height:205, backgroundColor:'#eff6ff' }} />
@@ -6990,18 +6998,21 @@ const MachineSection: React.FC<SectionProps> = ({ color }) => {
         // ── Machine groups ───────────────────────────────────────────────────
         const hardcodedProdNames = new Set(['FT-1','FT-2','MST','PL22','SL28','SL32','SL300','Robo','Threading']);
         const getSection = (name: string) => supabaseMachines.find(s => s.name === name)?.section?.toLowerCase() || '';
+        const isCompressor = (name: string) => { const n = name.toLowerCase(); return n.includes('compressor') || n.includes('空压'); };
+        const isPrinter    = (name: string) => { const n = name.toLowerCase(); return n.includes('printer') || n.includes('打印'); };
         const isSupport = (name: string) => {
           const sec = getSection(name);
           if (sec === 'other' || sec === 'support') return true;
-          const n = name.toLowerCase();
           return !hardcodedProdNames.has(name) && !isForklift(name) && !isCrane(name) &&
-            (n.includes('compressor') || n.includes('printer') || n.includes('空压') || n.includes('打印'));
+            (isCompressor(name) || isPrinter(name));
         };
-        const machineNames = allMachines.map(m => m.name);
-        const forkliftMachines = machineNames.filter(isForklift);
-        const craneMachines    = machineNames.filter(isCrane);
-        const supportMachines  = machineNames.filter(isSupport);
-        const prodMachines     = machineNames.filter(m => !isForklift(m) && !isCrane(m) && !isSupport(m));
+        const machineNames      = allMachines.map(m => m.name);
+        const forkliftMachines  = machineNames.filter(isForklift);
+        const craneMachines     = machineNames.filter(isCrane);
+        const compressorMachines= machineNames.filter(isCompressor);
+        const printerMachines   = machineNames.filter(isPrinter);
+        const supportMachines   = machineNames.filter(m => isSupport(m) && !isCompressor(m) && !isPrinter(m));
+        const prodMachines      = machineNames.filter(m => !isForklift(m) && !isCrane(m) && !isSupport(m));
 
         const [showImport, setShowImport] = React.useState(false);
         const [importText, setImportText] = React.useState('');
@@ -7076,9 +7087,25 @@ const MachineSection: React.FC<SectionProps> = ({ color }) => {
                     </div>
                   </div>
                 )}
+                {compressorMachines.length > 0 && (
+                  <div className="space-y-4">
+                    <CategoryHeader title="空压机 (Air Compressors)" IconC={({className}) => <Activity className={className}/>} color="bg-cyan-600" description="Compressed Air Systems"/>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-6">
+                      {compressorMachines.map(m => <MachineCardPro key={m} m={m}/>)}
+                    </div>
+                  </div>
+                )}
+                {printerMachines.length > 0 && (
+                  <div className="space-y-4">
+                    <CategoryHeader title="打印机 (Printers)" IconC={({className}) => <Activity className={className}/>} color="bg-purple-600" description="Label & Document Printers"/>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-6">
+                      {printerMachines.map(m => <MachineCardPro key={m} m={m}/>)}
+                    </div>
+                  </div>
+                )}
                 {supportMachines.length > 0 && (
                   <div className="space-y-4">
-                    <CategoryHeader title="支持设备 (Support)" IconC={({className}) => <Activity className={className}/>} color="bg-slate-500" description="Air Compressors, Printers & Support Equipment"/>
+                    <CategoryHeader title="其他支持设备 (Other)" IconC={({className}) => <Activity className={className}/>} color="bg-slate-500" description="Other Support Equipment"/>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-6">
                       {supportMachines.map(m => <MachineCardPro key={m} m={m}/>)}
                     </div>
