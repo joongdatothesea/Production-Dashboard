@@ -7055,14 +7055,6 @@ const MachineSection: React.FC<SectionProps> = ({ color }) => {
                     </div>
                   </div>
                 )}
-                {supportMachines.length > 0 && (
-                  <div className="space-y-4">
-                    <CategoryHeader title="支持设备 (Support)" IconC={({className}) => <Activity className={className}/>} color="bg-slate-500" description="Air Compressors, Printers & Support Equipment"/>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-6">
-                      {supportMachines.map(m => <MachineCardPro key={m} m={m}/>)}
-                    </div>
-                  </div>
-                )}
                 {craneMachines.length > 0 && (
                   <div className="space-y-4">
                     <CategoryHeader title="车间行车 (Cranes)" IconC={({className}) => <Hammer className={className}/>} color="bg-indigo-600"/>
@@ -7081,6 +7073,14 @@ const MachineSection: React.FC<SectionProps> = ({ color }) => {
                           </div>
                         );
                       })}
+                    </div>
+                  </div>
+                )}
+                {supportMachines.length > 0 && (
+                  <div className="space-y-4">
+                    <CategoryHeader title="支持设备 (Support)" IconC={({className}) => <Activity className={className}/>} color="bg-slate-500" description="Air Compressors, Printers & Support Equipment"/>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-6">
+                      {supportMachines.map(m => <MachineCardPro key={m} m={m}/>)}
                     </div>
                   </div>
                 )}
