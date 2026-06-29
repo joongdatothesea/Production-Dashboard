@@ -1490,13 +1490,13 @@ const SafetySection: React.FC<SafetySectionProps> = ({ color, accidentFreeDays, 
         );
       })()}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(220px,300px)_minmax(260px,360px)] gap-6 flex-1 min-h-0 overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(12em,15em)_minmax(24em,30em)] gap-6 flex-1 min-h-0 overflow-hidden">
 
         {/* Safety Wall */}
         <SafetyWall />
 
         {/* Safety Alerts — A4 portrait ratio */}
-        <div className="bg-white border-2 border-slate-100 rounded-2xl px-3 py-2 shadow-sm flex flex-col overflow-hidden" style={{ width: '100%', maxHeight: '100%' }}>
+        <div className="bg-white border-2 border-slate-100 rounded-2xl px-3 py-2 shadow-sm flex flex-col overflow-hidden" style={{ width: '100%', aspectRatio: '210/297', maxHeight: '100%', alignSelf: 'start' }}>
           <div className="flex items-center justify-between mb-2 shrink-0">
             <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Safety Alerts</h3>
             <button
