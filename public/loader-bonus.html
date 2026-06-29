@@ -163,7 +163,7 @@ table.sg td.v0 .lb{color:#374151}
     <div class="logo">LB</div>
     <div>
       <div class="ttl">Loader Bonus Calculator</div>
-      <div class="sub">v3 · 综合系数=(效率分+难度分)×班次系数×人数系数 · 门槛≥1.0 · 每人单车上限$<span id="capLabel">50</span> · Is_Valid=1</div>
+      <div class="sub">v3 · 综合系数=(效率分+难度分)×班次系数×人数系数 · 门槛≥1.0 · 单车上限$<span id="capLabel">50</span>×人数倍率 · Is_Valid=1</div>
     </div>
   </div>
   <div style="display:flex;align-items:center;gap:12px">
@@ -336,7 +336,22 @@ table.sg td.v0 .lb{color:#374151}
           <div class="set-r">
             <label>每人单车奖金上限 ($)</label>
             <input type="number" class="ni" id="maxPool" value="50" step="1" min="1" max="999" onchange="saveSetting('maxPool',this.value);updateCapLabels();recalcAll();showSaved('sv0')">
-            <span style="font-size:10px;color:var(--mt);font-family:var(--mo)">每人从单台车最多获得此金额 · 每人奖金 = min(综合系数×重量t÷人数, 此上限)</span>
+            <span style="font-size:10px;color:var(--mt);font-family:var(--mo)">基础上限，按人数乘以下方倍率</span>
+          </div>
+          <div class="set-r">
+            <label>1人装车 上限倍率</label>
+            <input type="number" class="ni" id="capM1" value="2.0" step="0.1" min="0.1" max="10" onchange="saveSetting('capM1',this.value);updateCapLabels();recalcAll();showSaved('sv0')">
+            <span style="font-size:10px;color:var(--mt);font-family:var(--mo)">1人装车每人上限 = $<span class="cap-lbl">50</span> × <span id="capM1Disp">2.0</span> = <strong style="color:var(--gn)">$<span id="capM1Val">100.0</span></strong></span>
+          </div>
+          <div class="set-r">
+            <label>2人装车 上限倍率</label>
+            <input type="number" class="ni" id="capM2" value="1.5" step="0.1" min="0.1" max="10" onchange="saveSetting('capM2',this.value);updateCapLabels();recalcAll();showSaved('sv0')">
+            <span style="font-size:10px;color:var(--mt);font-family:var(--mo)">2人装车每人上限 = $<span class="cap-lbl">50</span> × <span id="capM2Disp">1.5</span> = <strong style="color:var(--am)">$<span id="capM2Val">75.0</span></strong></span>
+          </div>
+          <div class="set-r">
+            <label>3人装车 上限倍率</label>
+            <input type="number" class="ni" id="capM3" value="1.0" step="0.1" min="0.1" max="10" onchange="saveSetting('capM3',this.value);updateCapLabels();recalcAll();showSaved('sv0')">
+            <span style="font-size:10px;color:var(--mt);font-family:var(--mo)">3人装车每人上限 = $<span class="cap-lbl">50</span> × <span id="capM3Disp">1.0</span> = <strong style="color:var(--tx)">$<span id="capM3Val">50.0</span></strong></span>
           </div>
           <div class="set-r">
             <label>效率分权重</label>
@@ -356,7 +371,7 @@ table.sg td.v0 .lb{color:#374151}
             <span style="color:var(--tx);font-weight:600">综合系数</span> = (效率分×<span id="wEffDisp">1.0</span> + 难度分×<span id="wDiffDisp">1.0</span>) × 最终班次系数 × 人数系数<br>
             <span style="color:var(--tx);font-weight:600">最终班次系数</span> = 发货量系数 × 效率系数（效率=发货量t÷工时h）<br>
             <span style="color:var(--tx);font-weight:600">奖金条件</span> = 综合系数 ≥ <span id="minCombDisp">1.0</span> 才计奖，否则该台车奖金为 $0<br>
-            <span style="color:var(--tx);font-weight:600">每人奖金</span> = min(综合系数 × 重量t ÷ 人数, 每人上限$<span class="cap-lbl">50</span>) &nbsp;·&nbsp; <span style="color:var(--gn)">上限作用于每个人，不是奖金池总额</span>
+            <span style="color:var(--tx);font-weight:600">每人奖金</span> = min(综合系数 × 重量t ÷ 人数, 基础上限$<span class="cap-lbl">50</span> × 人数倍率) &nbsp;·&nbsp; <span style="color:var(--gn)">1人×<span id="capM1DispB">2.0</span> / 2人×<span id="capM2DispB">1.5</span> / 3人×<span id="capM3DispB">1.0</span></span>
           </div>
         </div>
         <div class="sg">
@@ -480,7 +495,7 @@ let allRows=[],results=[],dateFrom='',dateTo='',uChart=null,selP=null;
 function ls_load(){try{const r=localStorage.getItem(LS);return r?JSON.parse(r):null;}catch(e){return null;}}
 function ls_save(extra={}){
   try{
-    const s={c1:gv('c1'),c2:gv('c2'),c3:gv('c3'),amS:gv_s('amS'),amE:gv_s('amE'),pmS:gv_s('pmS'),pmE:gv_s('pmE'),maxPool:gv('maxPool'),wEff:gv('wEff'),wDiff:gv('wDiff'),minCombined:gv('minCombined'),tiers:TIERS,effTiers:EFF_TIERS,scoreTable:STBL,loaderNames:KNOWN,...extra};
+    const s={c1:gv('c1'),c2:gv('c2'),c3:gv('c3'),amS:gv_s('amS'),amE:gv_s('amE'),pmS:gv_s('pmS'),pmE:gv_s('pmE'),maxPool:gv('maxPool'),capM1:gv('capM1'),capM2:gv('capM2'),capM3:gv('capM3'),wEff:gv('wEff'),wDiff:gv('wDiff'),minCombined:gv('minCombined'),tiers:TIERS,effTiers:EFF_TIERS,scoreTable:STBL,loaderNames:KNOWN,...extra};
     localStorage.setItem(LS,JSON.stringify(s));
     flashSI();
   }catch(e){}
@@ -496,6 +511,9 @@ function applyLS(){
   if(s.pmS)document.getElementById('pmS').value=s.pmS;
   if(s.pmE)document.getElementById('pmE').value=s.pmE;
   if(s.maxPool)document.getElementById('maxPool').value=s.maxPool;
+  if(s.capM1!=null)document.getElementById('capM1').value=s.capM1;
+  if(s.capM2!=null)document.getElementById('capM2').value=s.capM2;
+  if(s.capM3!=null)document.getElementById('capM3').value=s.capM3;
   if(s.wEff)document.getElementById('wEff').value=s.wEff;
   if(s.wDiff)document.getElementById('wDiff').value=s.wDiff;
   if(s.minCombined)document.getElementById('minCombined').value=s.minCombined;
@@ -517,6 +535,17 @@ function updateCapLabels(){
   document.getElementById('capLabel').textContent=v;
   document.querySelectorAll('[id="capFL"]').forEach(el=>el.textContent=v);
   document.querySelectorAll('.cap-lbl').forEach(el=>el.textContent=v);
+  // Update per-count multiplier preview
+  const base=parseFloat(v)||50;
+  const m1=parseFloat(document.getElementById('capM1').value)||2.0;
+  const m2=parseFloat(document.getElementById('capM2').value)||1.5;
+  const m3=parseFloat(document.getElementById('capM3').value)||1.0;
+  ['capM1Disp','capM1DispB'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=m1.toFixed(1).replace(/\.0$/,'');});
+  ['capM2Disp','capM2DispB'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=m2.toFixed(1).replace(/\.0$/,'');});
+  ['capM3Disp','capM3DispB'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=m3.toFixed(1).replace(/\.0$/,'');});
+  const el1=document.getElementById('capM1Val');if(el1)el1.textContent=(base*m1).toFixed(1);
+  const el2=document.getElementById('capM2Val');if(el2)el2.textContent=(base*m2).toFixed(1);
+  const el3=document.getElementById('capM3Val');if(el3)el3.textContent=(base*m3).toFixed(1);
   updateFormulaDisplay();
 }
 function updateFormulaDisplay(){
@@ -661,13 +690,17 @@ function delET(i){const s=[...EFF_TIERS].sort((a,b)=>a.e-b.e);s.splice(i,1);EFF_
 // ── Calculation ───────────────────────────────────────────────────────────
 function calcAll(){
   const MAX=getMaxPool();
+  const m1=parseFloat(document.getElementById('capM1').value)||2.0;
+  const m2=parseFloat(document.getElementById('capM2').value)||1.5;
+  const m3=parseFloat(document.getElementById('capM3').value)||1.0;
+  const capMults={1:m1,2:m2,3:m3};
   const wEff=parseFloat(document.getElementById('wEff').value)||1.0;
   const wDiff=parseFloat(document.getElementById('wDiff').value)||1.0;
   const minComb=getMinCombined();
 
-  // Step 1: valid tonnage per day-shift (for发货量 tier)
+  // Step 1: all tonnage per day-shift (for发货量 tier) — 含无效车，发货量反映实际出门货量
   const dst={};
-  allRows.forEach(r=>{if(!r.valid)return;const k=r.date+'|'+r.shift;dst[k]=(dst[k]||0)+r.weight/1000;});
+  allRows.forEach(r=>{const k=r.date+'|'+r.shift;dst[k]=(dst[k]||0)+r.weight/1000;});
 
   // Step 2: 效率 = 有效发货量(t) ÷ 有效工作时间(h)，用首车→末车时长
   // KEY FIX: use startDate (actual LoadingStart date) not Date_ for grouping
@@ -721,15 +754,18 @@ function calcAll(){
     const combined=(r.bs*wEff+r.ds*wDiff)*finalTier*lc;
     const eligible=r.valid&&combined>=minComb;
     const rawPool=eligible?wt*combined:0;
-    // ── Per-person cap: each loader gets at most MAX from this truck ──
+    // ── Per-person cap: each loader gets at most MAX×multiplier from this truck ──
+    const numKey=Math.min(3,r.numL||2);
+    const capPerPerson=MAX*(capMults[numKey]||1.0);
     const rawPP=r.numL?rawPool/r.numL:0;   // per-person before cap
-    const pp=Math.min(rawPP,MAX);           // cap applied per person
+    const pp=Math.min(rawPP,capPerPerson);  // cap applied per person
     const pool=pp*(r.numL||1);              // actual total pool after cap
     r._lc=lc; r._tier=tier; r._effC=effC; r._finalTier=finalTier;
     r._combined=combined; r._rawPool=rawPool; r._pool=pool;
-    r._capped=eligible&&rawPP>MAX;          // only capped if each person exceeds limit
+    r._capped=eligible&&rawPP>capPerPerson; // only capped if each person exceeds limit
     r._eligible=eligible;
     r._pp=pp;
+    r._capPerPerson=capPerPerson;
   });
 
   const p={};KNOWN.forEach(n=>p[n]={tot:0,eb:0,db:0,tr:0,tr_elig:0,wt:0,bs:[],ds:[],tm:[],at:0,pt:0,aw:0,pw:0});
