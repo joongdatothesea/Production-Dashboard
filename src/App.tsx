@@ -1490,7 +1490,7 @@ const SafetySection: React.FC<SafetySectionProps> = ({ color, accidentFreeDays, 
         );
       })()}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(18em,26em)_minmax(12em,16em)_1fr] gap-6 flex-1 min-h-0 overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr_1fr] gap-6 flex-1 min-h-0 overflow-hidden">
 
         {/* Safety Wall */}
         <SafetyWall />
